@@ -1,2 +1,4 @@
+[core]
+    remote = origin
 ['remote "origin"']
-    url = https://dagshub.com/Vaibha3246/influence_mirror.s3
+    url = https://dagshub.com/Vaibha3246/influence_mirror.dvc
