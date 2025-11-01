@@ -1,0 +1,5 @@
+outs:
+- md5: ca6e68c3644212619dcf8dc91b38b39b
+  size: 673053
+  hash: md5
+  path: xgb_tfidf_final.pkl

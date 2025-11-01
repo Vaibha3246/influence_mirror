@@ -1,0 +1,5 @@
+outs:
+- md5: 8207e1f35aa586365214374284686261
+  size: 57087
+  hash: md5
+  path: logreg_best_model.pkl

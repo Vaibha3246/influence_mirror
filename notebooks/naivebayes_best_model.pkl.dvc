@@ -1,0 +1,5 @@
+outs:
+- md5: a0c9dc0d6f8473241b2e8f0425059da8
+  size: 225591
+  hash: md5
+  path: naivebayes_best_model.pkl
