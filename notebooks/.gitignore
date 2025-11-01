@@ -1,0 +1,13 @@
+/knn_best_model.pkl
+/lightgbm_best_model.pkl
+/linearsvc_best_model.pkl
+/logreg_best_model.pkl
+/naivebayes_best_model.pkl
+/random_forest_best_model.pkl
+/scaler.pkl
+/svd_model.pkl
+/tfidf_vectorizer.pkl
+/xgb311_best_model.pkl
+/xgboost_best_model.pkl
+/xgboost_fast.pkl
+/xgb_tfidf_final.pkl
