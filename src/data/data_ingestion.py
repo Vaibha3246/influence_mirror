@@ -100,7 +100,7 @@ def save_data(train_data: pd.DataFrame, test_data: pd.DataFrame, data_path: str)
 
 def main():
     try:
-        # --- ✅ Base project root (always correct regardless of where you run it)
+        # ---  Base project root (always correct regardless of where you run it)
         BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
         # --- Load params
