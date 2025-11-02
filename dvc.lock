@@ -65,6 +65,6 @@ stages:
     outs:
     - path: data/features
       hash: md5
-      md5: d40bd519f20329071a802192aedb125c.dir
-      size: 19132502
+      md5: c5863df3c6cde4640fbe62641319a316.dir
+      size: 7781214
       nfiles: 6
