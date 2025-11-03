@@ -4,3 +4,11 @@ data_ingestion:
 feature_engineering:
    max_features: 10000        # Number of TF-IDF features to extract
    ngram_range: [1, 3]        # N-gram range for TF-IDF (1 = unigram, 3 = trigram)
+
+model_building:
+   model_type: xgboost
+   learning_rate: 0.1
+   max_depth: 7
+   n_estimators: 250
+   objective: multi:softprob
+   eval_metric: mlogloss   
