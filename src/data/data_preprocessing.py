@@ -143,9 +143,9 @@ def normalize_text(df):
         # Step 5: Sentiment Analysis
         df['sentiment'] = df['text_clean'].apply(get_sentiment)
         df['sentiment_numeric'] = df['sentiment'].replace({
-            'positive': 1,
-            'negative': -1,
-            'neutral': 0
+            'positive': 2,
+            'negative': 0,
+            'neutral': 1
         })
 
         # Step 6: Feature Engineering

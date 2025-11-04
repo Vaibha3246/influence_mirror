@@ -24,11 +24,15 @@ stages:
       - data/processed/train_processed.csv
       - data/processed/test_processed.csv
       - src/features/feature_engineering.py
+      - params.yaml
     params:
       - feature_engineering.max_features
       - feature_engineering.ngram_range
     outs:
-      - data/features
+      - data/features/train_features.pkl
+      - data/features/test_features.pkl
+      - data/features/tfidf_vectorizer.pkl
+      - data/features/scaler.pkl
 
   model_building:
     cmd: python src/model/model_building.py
@@ -46,5 +50,14 @@ stages:
       - model_building.eval_metric
     outs:
       - models/xgboost_best.pkl
-      - confusion_matrix.png
-      - model_building_errors.log
+      
+  model_evaluation:
+    cmd: python src/model/model_evaluation.py
+    deps:
+      - src/model/model_evaluation.py
+      - models/xgboost_best.pkl
+      - data/features/test_features.pkl
+      - params.yaml
+    outs:
+      - reports/metrics.json
+      - reports/confusion_matrix.png

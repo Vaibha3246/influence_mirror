@@ -11,24 +11,28 @@ from nrclex import NRCLex
 from scipy import sparse as sp
 import yaml
 
+
+# LOGGING SETUP
 logger = logging.getLogger('feature_engineering')
-logger.setLevel('DEBUG')
+logger.setLevel(logging.DEBUG)
 
 console_handler = logging.StreamHandler()
-console_handler.setLevel('DEBUG')
+console_handler.setLevel(logging.INFO)
 
 file_handler = logging.FileHandler('feature_engineering_errors.log')
-file_handler.setLevel('ERROR')
+file_handler.setLevel(logging.ERROR)
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 console_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
 
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
+if not logger.handlers:
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
 
 nltk.download('vader_lexicon', quiet=True)
 
+# LOAD PARAMS
 with open("params.yaml", "r") as f:
     params = yaml.safe_load(f)["feature_engineering"]
 
@@ -36,25 +40,21 @@ MAX_FEATURES = params.get("max_features", 10000)
 NGRAM_RANGE = tuple(params.get("ngram_range", [1, 3]))
 
 
+# HELPER FUNCTIONS
+
 def one_hot_encode(df: pd.DataFrame) -> pd.DataFrame:
     if 'category' not in df.columns:
         return df
-    try:
-        ohe = OneHotEncoder(sparse_output=False, drop='first')
-    except TypeError:
-        ohe = OneHotEncoder(sparse=False, drop='first')
+    ohe = OneHotEncoder(sparse_output=False, drop='first')
     encoded = ohe.fit_transform(df[['category']])
     encoded_df = pd.DataFrame(encoded, columns=ohe.get_feature_names_out(['category']))
-    df = pd.concat([df.reset_index(drop=True), encoded_df.reset_index(drop=True)], axis=1)
-    return df
+    return pd.concat([df.reset_index(drop=True), encoded_df.reset_index(drop=True)], axis=1)
 
 
 def add_vader_features(df: pd.DataFrame) -> pd.DataFrame:
     sia = SentimentIntensityAnalyzer()
-    df[['sent_neg', 'sent_neu', 'sent_pos', 'sent_compound']] = df['text_clean'].apply(
-        lambda x: pd.Series(sia.polarity_scores(str(x)))
-    )
-    return df
+    vader_scores = df['text_clean'].apply(lambda x: pd.Series(sia.polarity_scores(str(x))))
+    return pd.concat([df.reset_index(drop=True), vader_scores.reset_index(drop=True)], axis=1)
 
 
 def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -85,44 +85,29 @@ def get_emotion_probabilities(text: str) -> dict:
 def add_emotion_features(df: pd.DataFrame) -> pd.DataFrame:
     emotion_data = df['text_clean'].apply(get_emotion_probabilities)
     emotion_df = pd.DataFrame(list(emotion_data))
-    df = pd.concat([df.reset_index(drop=True), emotion_df.reset_index(drop=True)], axis=1)
-    return df
+    return pd.concat([df.reset_index(drop=True), emotion_df.reset_index(drop=True)], axis=1)
 
 
-def scale_numeric(df: pd.DataFrame, exclude_cols: list):
+def scale_numeric(df: pd.DataFrame, exclude_cols: list, scaler=None, fit=True):
     num_cols = [c for c in df.select_dtypes(include=[np.number]).columns if c not in exclude_cols]
-    scaler = StandardScaler()
-    df[num_cols] = scaler.fit_transform(df[num_cols])
+    if fit:
+        scaler = StandardScaler()
+        df[num_cols] = scaler.fit_transform(df[num_cols])
+    else:
+        df[num_cols] = scaler.transform(df[num_cols])
     return df, scaler
 
 
-def process_dataset(df: pd.DataFrame, output_dir: str, name: str):
-    logger.debug(f"Processing dataset: {name}")
-
+def process_dataset(df: pd.DataFrame) -> pd.DataFrame:
     df = one_hot_encode(df)
     df = add_vader_features(df)
     df = add_time_features(df)
     df = add_emotion_features(df)
     df = df.dropna(subset=['sentiment_numeric'])
+    return df
 
-    tfidf = TfidfVectorizer(ngram_range=NGRAM_RANGE, max_features=MAX_FEATURES)
-    X_text = tfidf.fit_transform(df['text_clean'])
-    joblib.dump(tfidf, os.path.join(output_dir, f"{name}_tfidf_vectorizer.pkl"))
 
-    drop_cols = [
-        'category', 'text', 'text_clean', 'sentiment',
-        'published_at', 'dominant_emotion', 'sentiment_numeric'
-    ]
-    X_num = df.drop(columns=[c for c in drop_cols if c in df.columns], errors='ignore')
-    X_num_scaled, scaler = scale_numeric(X_num, [])
-    joblib.dump(scaler, os.path.join(output_dir, f"{name}_scaler.pkl"))
-
-    X_combined = sp.hstack([X_text, sp.csr_matrix(X_num_scaled)])
-    y = df['sentiment_numeric']
-
-    joblib.dump({'X': X_combined, 'y': y}, os.path.join(output_dir, f"{name}_features.pkl"))
-    logger.debug(f"Saved features for {name}")
-
+# MAIN FUNCTION
 
 def main():
     try:
@@ -131,15 +116,57 @@ def main():
         output_path = os.path.join(base_dir, 'data', 'features')
         os.makedirs(output_path, exist_ok=True)
 
+        logger.info("Loading processed train and test data...")
         train_df = pd.read_csv(os.path.join(input_path, 'train_processed.csv'))
         test_df = pd.read_csv(os.path.join(input_path, 'test_processed.csv'))
 
-        process_dataset(train_df, output_path, 'train')
-        process_dataset(test_df, output_path, 'test')
+        # Drop any NaN text before vectorization (safety)
+        train_df = train_df.dropna(subset=['text_clean'])
+        test_df = test_df.dropna(subset=['text_clean'])
 
-        logger.debug("Feature engineering completed successfully.")
+        logger.info("Applying feature transformations...")
+        train_df = process_dataset(train_df)
+        test_df = process_dataset(test_df)
+
+        # TF-IDF (fit on train only)
+        tfidf_path = os.path.join(output_path, "tfidf_vectorizer.pkl")
+        tfidf = TfidfVectorizer(ngram_range=NGRAM_RANGE, max_features=MAX_FEATURES)
+        X_train_text = tfidf.fit_transform(train_df['text_clean'])
+        X_test_text = tfidf.transform(test_df['text_clean'])
+        joblib.dump(tfidf, tfidf_path)
+        logger.info(f"Saved TF-IDF vectorizer to {tfidf_path}")
+
+        # Prepare numeric features
+        drop_cols = ['category', 'text', 'text_clean', 'sentiment', 'published_at', 'sentiment_numeric']
+        X_train_num = train_df.drop(columns=[c for c in drop_cols if c in train_df.columns], errors='ignore')
+        X_test_num = test_df.drop(columns=[c for c in drop_cols if c in test_df.columns], errors='ignore')
+
+        # Scale numeric (fit on train only)
+        scaler_path = os.path.join(output_path, "scaler.pkl")
+        X_train_num_scaled, scaler = scale_numeric(X_train_num, [], fit=True)
+        X_test_num_scaled, _ = scale_numeric(X_test_num, [], scaler=scaler, fit=False)
+        joblib.dump(scaler, scaler_path)
+        logger.info(f"Saved scaler to {scaler_path}")
+
+        # Combine TF-IDF + Numeric features
+        X_train = sp.hstack([X_train_text, sp.csr_matrix(X_train_num_scaled)])
+        X_test = sp.hstack([X_test_text, sp.csr_matrix(X_test_num_scaled)])
+
+        y_train = train_df['sentiment_numeric'].to_numpy()
+        y_test = test_df['sentiment_numeric'].to_numpy()
+
+        # Log feature shapes
+        logger.info(f"X_train shape: {X_train.shape}, X_test shape: {X_test.shape}")
+        logger.info(f"y_train size: {len(y_train)}, y_test size: {len(y_test)}")
+
+        # Save final feature sets
+        joblib.dump({'X': X_train, 'y': y_train}, os.path.join(output_path, 'train_features.pkl'))
+        joblib.dump({'X': X_test, 'y': y_test}, os.path.join(output_path, 'test_features.pkl'))
+
+        logger.info("Feature engineering completed successfully.")
+
     except Exception as e:
-        logger.error(f"Feature engineering error: {e}")
+        logger.exception(f"Feature engineering failed: {e}")
         raise
 
 
