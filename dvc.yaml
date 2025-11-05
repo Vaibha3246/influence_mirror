@@ -50,6 +50,14 @@ stages:
       - model_building.eval_metric
     outs:
       - models/xgboost_best.pkl
+      - models/env/conda.yaml
+      - models/env/python_env.yaml
+      - models/env/requirements.txt
+      - confusion_matrix.png
+      - experiment_info.json
+    metrics:
+      - metrics.json:
+          cache: false 
       
   model_evaluation:
     cmd: python src/model/model_evaluation.py
