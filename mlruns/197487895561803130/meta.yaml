@@ -1,0 +1,6 @@
+artifact_location: file:///E:/mlops_projects/influence_mirror/mlruns/197487895561803130
+creation_time: 1762592978263
+experiment_id: '197487895561803130'
+last_update_time: 1762592978263
+lifecycle_stage: active
+name: dvc_pipeline

@@ -1,174 +1,175 @@
 import os
+import logging
+import yaml
+import nltk
+from nltk.corpus import stopwords
+from pathlib import Path
 import pandas as pd
 import numpy as np
-import joblib
-import logging
-import nltk
+from tqdm.auto import tqdm
+from sentence_transformers import SentenceTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.feature_extraction.text import TfidfVectorizer
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nrclex import NRCLex
-from scipy import sparse as sp
-import yaml
+import joblib
+import json
 
-
-# LOGGING SETUP
-logger = logging.getLogger('feature_engineering')
-logger.setLevel(logging.DEBUG)
-
+# -----------------------------
+# Logger setup
+# -----------------------------
+logger = logging.getLogger("feature_engineering")
+logger.setLevel(logging.INFO)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
+logger.addHandler(console_handler)
 
-file_handler = logging.FileHandler('feature_engineering_errors.log')
-file_handler.setLevel(logging.ERROR)
-
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
-
-if not logger.handlers:
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
-
-nltk.download('vader_lexicon', quiet=True)
-
-# LOAD PARAMS
-with open("params.yaml", "r") as f:
+# -----------------------------
+# Base Path and params
+# -----------------------------
+BASE = Path(__file__).resolve().parents[2]
+with open(BASE / "params.yaml") as f:
     params = yaml.safe_load(f)["feature_engineering"]
 
-MAX_FEATURES = params.get("max_features", 10000)
-NGRAM_RANGE = tuple(params.get("ngram_range", [1, 3]))
+train_processed_path = BASE / params["train_processed"]
+test_processed_path = BASE / params["test_processed"]
+output_path = BASE / params["output_path"]
 
+BATCH_SIZE = params["batch_size"]
+SBERT_MODEL = "all-MiniLM-L6-v2"
 
-# HELPER FUNCTIONS
+# -----------------------------
+# Download stopwords
+# -----------------------------
+nltk.download("stopwords")
+stop_words = set(stopwords.words("english"))
 
-def one_hot_encode(df: pd.DataFrame) -> pd.DataFrame:
-    if 'category' not in df.columns:
-        return df
-    ohe = OneHotEncoder(sparse_output=False, drop='first')
-    encoded = ohe.fit_transform(df[['category']])
-    encoded_df = pd.DataFrame(encoded, columns=ohe.get_feature_names_out(['category']))
-    return pd.concat([df.reset_index(drop=True), encoded_df.reset_index(drop=True)], axis=1)
-
-
-def add_vader_features(df: pd.DataFrame) -> pd.DataFrame:
-    sia = SentimentIntensityAnalyzer()
-    vader_scores = df['text_clean'].apply(lambda x: pd.Series(sia.polarity_scores(str(x))))
-    return pd.concat([df.reset_index(drop=True), vader_scores.reset_index(drop=True)], axis=1)
-
-
-def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
-    if 'published_at' not in df.columns:
-        return df
-    df['published_at'] = pd.to_datetime(df['published_at'], errors='coerce')
-    df['hour'] = df['published_at'].dt.hour
-    df['weekday'] = df['published_at'].dt.weekday
-    df['month'] = df['published_at'].dt.month
+# -----------------------------
+# Feature functions
+# -----------------------------
+def add_numeric_features(df):
+    df['num_stop_words'] = df['text_clean'].apply(lambda x: len([w for w in x.split() if w in stop_words]))
+    df['num_chars'] = df['text_clean'].apply(len)
+    df['num_punctuation_chars'] = df['text_clean'].apply(lambda x: sum([1 for c in x if c in '.,!?;:"\'()[]{}-']))
     return df
 
+def add_category_features(df, ohe=None, fit_ohe=True):
+    if 'category' not in df.columns:
+        return df, ohe
 
-def get_emotion_probabilities(text: str) -> dict:
-    emotions = NRCLex(str(text))
+    if ohe is None:
+        try:
+            ohe = OneHotEncoder(sparse_output=False, drop="first", handle_unknown="ignore")
+        except TypeError:
+            ohe = OneHotEncoder(sparse=False, drop="first", handle_unknown="ignore")
+
+    if fit_ohe:
+        cat_encoded = ohe.fit_transform(df[['category']])
+    else:
+        cat_encoded = ohe.transform(df[['category']])
+
+    cat_df = pd.DataFrame(cat_encoded, columns=ohe.get_feature_names_out(['category']))
+    df = pd.concat([df.reset_index(drop=True), cat_df.reset_index(drop=True)], axis=1)
+    return df, ohe
+
+
+
+def get_emotion_scores(text):
+    emotions = NRCLex(text)
     raw_scores = emotions.raw_emotion_scores
     total = sum(raw_scores.values())
-    base_emotions = {
-        'fear': 0, 'anger': 0, 'anticipation': 0, 'trust': 0,
-        'surprise': 0, 'positive': 0, 'negative': 0,
-        'sadness': 0, 'disgust': 0, 'joy': 0
-    }
+    all_emotions = {'fear':0,'anger':0,'anticipation':0,'trust':0,'surprise':0,'positive':0,
+                    'negative':0,'sadness':0,'disgust':0,'joy':0}
     if total > 0:
-        normalized = {k: v / total for k, v in raw_scores.items()}
-        base_emotions.update(normalized)
-    return base_emotions
+        probs = {emo: cnt/total for emo, cnt in raw_scores.items()}
+        all_emotions.update(probs)
+    return all_emotions
 
+# -----------------------------
+# Feature creation
+# -----------------------------
+def create_features(df, sbert=None, scaler=None, ohe=None, fit_scaler=True, fit_ohe=True):
+    df = df.dropna(subset=['text_clean', 'sentiment_numeric']).reset_index(drop=True)
+    logger.info(f"Rows after cleaning: {df.shape[0]}")
 
-def add_emotion_features(df: pd.DataFrame) -> pd.DataFrame:
-    emotion_data = df['text_clean'].apply(get_emotion_probabilities)
-    emotion_df = pd.DataFrame(list(emotion_data))
-    return pd.concat([df.reset_index(drop=True), emotion_df.reset_index(drop=True)], axis=1)
+    # Numeric features
+    df = add_numeric_features(df)
 
+    # Category features
+    df, ohe = add_category_features(df, ohe=ohe, fit_ohe=fit_ohe)
 
-def scale_numeric(df: pd.DataFrame, exclude_cols: list, scaler=None, fit=True):
-    num_cols = [c for c in df.select_dtypes(include=[np.number]).columns if c not in exclude_cols]
-    if fit:
-        scaler = StandardScaler()
-        df[num_cols] = scaler.fit_transform(df[num_cols])
+    # NRC emotion features
+    logger.info("Extracting NRC emotion features...")
+    emotion_features = df['text_clean'].apply(get_emotion_scores)
+    emotion_df = pd.DataFrame(list(emotion_features))
+    df = pd.concat([df, emotion_df], axis=1)
+
+    # Labels
+    y = df['sentiment_numeric'].astype(int).to_numpy()
+
+    # Drop non-feature columns
+    drop_cols = ['text', 'sentiment', 'category', 'sentiment_numeric']
+    df = df.drop(columns=[c for c in drop_cols if c in df.columns])
+
+    # SBERT embeddings
+    if sbert is None:
+        logger.info(f"Loading SBERT model: {SBERT_MODEL}")
+        sbert = SentenceTransformer(SBERT_MODEL)
+
+    texts = df['text_clean'].astype(str).tolist()
+    df = df.drop(columns=['text_clean'])
+
+    logger.info("Generating SBERT embeddings…")
+    embeddings = []
+    for i in tqdm(range(0, len(texts), BATCH_SIZE)):
+        batch = texts[i:i + BATCH_SIZE]
+        emb = sbert.encode(batch, convert_to_numpy=True)
+        embeddings.append(emb)
+    embeddings = np.vstack(embeddings)
+
+    # Scale numeric features
+    X_num = df.to_numpy()
+    if scaler is None:
+        scaler = StandardScaler(with_mean=False)
+    if fit_scaler:
+        X_num_scaled = scaler.fit_transform(X_num)
     else:
-        df[num_cols] = scaler.transform(df[num_cols])
-    return df, scaler
+        X_num_scaled = scaler.transform(X_num)
 
+    # Combine embeddings + numeric features
+    X = np.hstack([embeddings, X_num_scaled])
+    logger.info(f"Final shape → X: {X.shape}, y: {y.shape}")
 
-def process_dataset(df: pd.DataFrame) -> pd.DataFrame:
-    df = one_hot_encode(df)
-    df = add_vader_features(df)
-    df = add_time_features(df)
-    df = add_emotion_features(df)
-    df = df.dropna(subset=['sentiment_numeric'])
-    return df
+    # Save numeric column names for API use
+    numeric_cols = df.columns.tolist()
 
+    return X, y, sbert, scaler, ohe, numeric_cols
 
-# MAIN FUNCTION
-
+# -----------------------------
+# Main
+# -----------------------------
 def main():
-    try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        input_path = os.path.join(base_dir, 'data', 'processed')
-        output_path = os.path.join(base_dir, 'data', 'features')
-        os.makedirs(output_path, exist_ok=True)
+    logger.info("Loading processed train & test files...")
+    train_df = pd.read_csv(train_processed_path)
+    test_df = pd.read_csv(test_processed_path)
 
-        logger.info("Loading processed train and test data...")
-        train_df = pd.read_csv(os.path.join(input_path, 'train_processed.csv'))
-        test_df = pd.read_csv(os.path.join(input_path, 'test_processed.csv'))
+    # Train features
+    X_train, y_train, sbert, scaler, ohe, numeric_cols = create_features(train_df)
 
-        # Drop any NaN text before vectorization (safety)
-        train_df = train_df.dropna(subset=['text_clean'])
-        test_df = test_df.dropna(subset=['text_clean'])
+    # Test features using same SBERT, scaler, OHE
+    X_test, y_test, *_ = create_features(test_df, sbert=sbert, scaler=scaler, ohe=ohe,
+                                         fit_scaler=False, fit_ohe=False)
 
-        logger.info("Applying feature transformations...")
-        train_df = process_dataset(train_df)
-        test_df = process_dataset(test_df)
+    # Save features and artifacts
+    os.makedirs(output_path, exist_ok=True)
+    np.savez(output_path / "features_train.npz", X=X_train, y=y_train)
+    np.savez(output_path / "features_test.npz", X=X_test, y=y_test)
 
-        # TF-IDF (fit on train only)
-        tfidf_path = os.path.join(output_path, "tfidf_vectorizer.pkl")
-        tfidf = TfidfVectorizer(ngram_range=NGRAM_RANGE, max_features=MAX_FEATURES)
-        X_train_text = tfidf.fit_transform(train_df['text_clean'])
-        X_test_text = tfidf.transform(test_df['text_clean'])
-        joblib.dump(tfidf, tfidf_path)
-        logger.info(f"Saved TF-IDF vectorizer to {tfidf_path}")
+    joblib.dump(sbert, output_path / "sbert_model.pkl")
+    joblib.dump(scaler, output_path / "scaler.pkl")
+    joblib.dump(ohe, output_path / "ohe.pkl")
+    json.dump(numeric_cols, open(output_path / "numeric_cols.json", "w"))
 
-        # Prepare numeric features
-        drop_cols = ['category', 'text', 'text_clean', 'sentiment', 'published_at', 'sentiment_numeric']
-        X_train_num = train_df.drop(columns=[c for c in drop_cols if c in train_df.columns], errors='ignore')
-        X_test_num = test_df.drop(columns=[c for c in drop_cols if c in test_df.columns], errors='ignore')
+    logger.info(f"Saved features and artifacts to {output_path}")
+    logger.info("Feature Engineering Completed Successfully!")
 
-        # Scale numeric (fit on train only)
-        scaler_path = os.path.join(output_path, "scaler.pkl")
-        X_train_num_scaled, scaler = scale_numeric(X_train_num, [], fit=True)
-        X_test_num_scaled, _ = scale_numeric(X_test_num, [], scaler=scaler, fit=False)
-        joblib.dump(scaler, scaler_path)
-        logger.info(f"Saved scaler to {scaler_path}")
-
-        # Combine TF-IDF + Numeric features
-        X_train = sp.hstack([X_train_text, sp.csr_matrix(X_train_num_scaled)])
-        X_test = sp.hstack([X_test_text, sp.csr_matrix(X_test_num_scaled)])
-
-        y_train = train_df['sentiment_numeric'].to_numpy()
-        y_test = test_df['sentiment_numeric'].to_numpy()
-
-        # Log feature shapes
-        logger.info(f"X_train shape: {X_train.shape}, X_test shape: {X_test.shape}")
-        logger.info(f"y_train size: {len(y_train)}, y_test size: {len(y_test)}")
-
-        # Save final feature sets
-        joblib.dump({'X': X_train, 'y': y_train}, os.path.join(output_path, 'train_features.pkl'))
-        joblib.dump({'X': X_test, 'y': y_test}, os.path.join(output_path, 'test_features.pkl'))
-
-        logger.info("Feature engineering completed successfully.")
-
-    except Exception as e:
-        logger.exception(f"Feature engineering failed: {e}")
-        raise
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

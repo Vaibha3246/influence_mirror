@@ -1,1 +1,11 @@
 /xgboost_best.pkl
+/lightgbm_best.pkl
+/confusion_matrix.png
+/experiment_info.json
+/tfidf_vectorizer.pkl
+/final_lgbm_model.pkl
+/metrics.json
+/confusion_matrix.csv
+/classification_report.csv
+/lightgbm_best_model.pkl
+/model_version.json

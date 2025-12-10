@@ -1,218 +1,146 @@
-# src/data/data_preprocessing.py
-
-import numpy as np
-import pandas as pd
 import os
-import re, html, emoji
-import nltk
-import string
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import logging
+import pandas as pd
+import re, html, emoji
+import yaml
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+from tqdm import tqdm
 
-
-# Logging Configuration
-
-logger = logging.getLogger('data_preprocessing')
-logger.setLevel(logging.DEBUG)
-
+# ----------------------------
+# Logger Setup
+# ----------------------------
+logger = logging.getLogger("data_preprocessing")
+logger.setLevel(logging.INFO)
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-
-file_handler = logging.FileHandler('preprocessing_errors.log')
-file_handler.setLevel(logging.ERROR)
-
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
-
+console_handler.setLevel(logging.INFO)
 logger.addHandler(console_handler)
-logger.addHandler(file_handler)
 
+# ----------------------------
+# Paths and Params
+# ----------------------------
+BASE = Path(__file__).resolve().parents[2]
 
-# NLTK Resources
+with open(BASE / "params.yaml") as f:
+    params_all = yaml.safe_load(f)
+params = params_all["data_preprocessing"]
 
-nltk.download('wordnet')
-nltk.download('stopwords')
-nltk.download('omw-1.4')
+train_path = BASE / params["train_input"]
+test_path = BASE / params["test_input"]
+processed_path = BASE / params["output_path"]
 
+# ----------------------------
+# Load Sentiment Model
+# ----------------------------
+logger.info("Loading RoBERTa sentiment model...")
+device = "cuda" if torch.cuda.is_available() else "cpu"
+tokenizer = AutoTokenizer.from_pretrained(params["sentiment_model_name"])
+model = AutoModelForSequenceClassification.from_pretrained(params["sentiment_model_name"]).to(device)
+model.eval()  # Set model to eval mode
+labels = ["negative", "neutral", "positive"]
 
-# Sentiment Analyzer
-
-analyzer = SentimentIntensityAnalyzer()
-
-
-# Regex Patterns
-
+# ----------------------------
+# Cleaning regex
+# ----------------------------
 url_re = re.compile(r'https?://\S+|www\.\S+')
 mention_re = re.compile(r'@\w+')
 html_tag_re = re.compile(r'<.*?>')
 multispace_re = re.compile(r'\s+')
 
-
-# Base Cleaning Function
-
 def clean_text(text, remove_emojis=False):
-    """Clean raw text: remove URLs, mentions, HTML tags, extra spaces, etc."""
-    try:
-        if pd.isna(text):
-            return ""
+    s = str(text) if pd.notna(text) else ""
+    s = html.unescape(s)
+    s = url_re.sub(" ", s)
+    s = mention_re.sub(" ", s)
+    s = html_tag_re.sub(" ", s)
+    if remove_emojis:
+        try:
+            s = emoji.replace_emoji(s, replace='')
+        except:
+            s = s.encode('ascii', errors='ignore').decode()
+    s = s.lower()
+    s = multispace_re.sub(" ", s).strip()
+    return s
 
-        s = html.unescape(str(text))
-        s = url_re.sub(' ', s)
-        s = mention_re.sub(' ', s)
-        s = html_tag_re.sub(' ', s)
+# ----------------------------
+# Batch Sentiment Prediction
+# ----------------------------
+def predict_sentiment_batch(texts, batch_size=32):
+    all_sentiments = []
+    for i in tqdm(range(0, len(texts), batch_size), desc="Sentiment Batches"):
+        batch_texts = texts[i:i+batch_size].tolist()
+        try:
+            tokens = tokenizer(batch_texts, return_tensors='pt', padding=True, truncation=True, max_length=512)
+            tokens = {k:v.to(device) for k,v in tokens.items()}
+            with torch.no_grad():
+                outputs = model(**tokens)
+                scores = torch.softmax(outputs.logits, dim=1)
+                predicted = torch.argmax(scores, dim=1).cpu().numpy()
+                batch_labels = [labels[p] for p in predicted]
+                all_sentiments.extend(batch_labels)
+        except Exception as e:
+            logger.warning(f"Batch prediction error at index {i}-{i+batch_size}: {e}")
+            all_sentiments.extend(["error"]*len(batch_texts))
+    return all_sentiments
 
-        # Optionally remove emojis
-        if remove_emojis:
-            try:
-                s = emoji.replace_emoji(s, replace='')
-            except Exception:
-                s = s.encode('ascii', errors='ignore').decode()
+# ----------------------------
+# Preprocessing Function
+# ----------------------------
+def preprocess(df):
+    # Drop unnecessary columns to save memory
+    df = df.drop(columns=['author', 'video_id', 'likes', 'published_at'], errors='ignore')
 
-        # Lowercase and remove multiple spaces
-        s = s.lower()
-        s = multispace_re.sub(' ', s).strip()
+    # Remove empty or duplicate texts
+    df = df[df["text"].astype(str).str.strip() != ""].reset_index(drop=True)
+    df = df.drop_duplicates(subset="text", keep="first").reset_index(drop=True)
 
-        return s
-    except Exception as e:
-        logger.error(f"Error in clean_text: {e}")
-        return str(text)
+    logger.info("Cleaning text...")
+    df["text_clean"] = df["text"].apply(lambda x: clean_text(x, params["remove_emojis"]))
+    df = df[df["text_clean"] != ""].reset_index(drop=True)
 
+    # Word count filter (optional for SBERT)
+    df["word_count"] = df["text_clean"].apply(lambda x: len(x.split()))
+    df = df[
+        (df["word_count"] >= params["min_word_count"]) &
+        (df["word_count"] <= params["max_word_count"])
+    ].reset_index(drop=True)
 
-# Text Preprocessing
+    # Predict sentiment in batches
+    logger.info("Predicting sentiment...")
+    df["sentiment"] = predict_sentiment_batch(df["text_clean"], batch_size=params.get("batch_size", 32))
 
-def preprocess_text(text):
-    """Further preprocess text (remove special chars, lemmatize, remove stopwords)."""
-    try:
-        if pd.isna(text):
-            return ""
+    # Convert sentiment to numeric
+    df["sentiment_numeric"] = df["sentiment"].replace({
+        "positive": 1,
+        "negative": -1,
+        "neutral": 0,
+        "error": 0
+    })
 
-        # Remove newline characters
-        text = re.sub(r'\n', ' ', str(text))
+    return df
 
-        # Remove non-alphanumeric except punctuation
-        text = re.sub(r'[^A-Za-z0-9\s!?.,]', '', text)
-
-        # Define stopwords but retain negations
-        stop_words = set(stopwords.words('english')) - {'not', 'but', 'however', 'no', 'yet'}
-        text = ' '.join([word for word in text.split() if word.lower() not in stop_words])
-
-        # Lemmatization
-        lemmatizer = WordNetLemmatizer()
-        text = ' '.join([lemmatizer.lemmatize(word) for word in text.split()])
-
-        return text.strip()
-    except Exception as e:
-        logger.error(f"Error in preprocess_text: {e}")
-        return text
-
-
-# Sentiment Classification
-
-def get_sentiment(text):
-    score = analyzer.polarity_scores(str(text))['compound']
-    if score >= 0.05:
-        return "positive"
-    elif score <= -0.05:
-        return "negative"
-    else:
-        return "neutral"
-
-
-# Full Text Normalization Pipeline
-
-def normalize_text(df):
-    """Apply full preprocessing pipeline on df['text'].""" 
-    try:
-        logger.debug("Starting text normalization...")
-
-        # Step 1: Clean raw text
-        df['text_clean'] = df['text'].apply(lambda x: clean_text(x, remove_emojis=False))
-
-        # Step 2: Further preprocessing (stopwords, lemmatization)
-        df['text_clean'] = df['text_clean'].apply(preprocess_text)
-
-        # Step 3: Remove empty rows
-        df = df[~(df['text_clean'].str.strip() == '')].reset_index(drop=True)
-
-        # Step 4: Safety cleanup (remove non-English chars)
-        df['text_clean'] = df['text_clean'].apply(lambda x: re.sub(r'[^A-Za-z0-9\s!?.,]', '', str(x)))
-
-        # Step 5: Sentiment Analysis
-        df['sentiment'] = df['text_clean'].apply(get_sentiment)
-        df['sentiment_numeric'] = df['sentiment'].replace({
-            'positive': 2,
-            'negative': 0,
-            'neutral': 1
-        })
-
-        # Step 6: Feature Engineering
-        stop_words = set(stopwords.words('english'))
-        df['word_count'] = df['text_clean'].apply(lambda x: len(x.split()))
-        df = df[(df['word_count'] >= 2) & (df['word_count'] <= 100)]
-        df['num_chars'] = df['text_clean'].apply(len)
-        df['num_stop_words'] = df['text_clean'].apply(
-            lambda x: len([word for word in x.split() if word in stop_words])
-        )
-        df['num_punctuation_chars'] = df['text_clean'].apply(
-            lambda x: sum([1 for char in x if char in '.,!?;:"\'()[]{}-'])
-        )
-
-        logger.debug("Text normalization completed successfully.")
-        return df
-
-    except Exception as e:
-        logger.error(f"Error during text normalization: {e}")
-        raise
-
-
-# Save Processed Data
-def save_data(train_data: pd.DataFrame, test_data: pd.DataFrame, data_path: str) -> None:
-    """Save the processed train and test datasets."""
-    try:
-        processed_data_path = os.path.join(data_path, 'processed')
-        os.makedirs(processed_data_path, exist_ok=True)
-
-        train_data.to_csv(os.path.join(processed_data_path, "train_processed.csv"), index=False)
-        test_data.to_csv(os.path.join(processed_data_path, "test_processed.csv"), index=False)
-
-        logger.debug(f"Processed data saved to {processed_data_path}")
-    except Exception as e:
-        logger.error(f"Error occurred while saving data: {e}")
-        raise
-
-
-# Main Execution
-
+# ----------------------------
+# Main Function
+# ----------------------------
 def main():
-    try:
-        logger.debug("Starting full data preprocessing pipeline...")
+    logger.info("Loading interim train & test CSVs...")
+    train_df = pd.read_csv(train_path)
+    test_df = pd.read_csv(test_path)
 
-        # --- Base project root (same as ingestion)
-        BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    logger.info("Preprocessing train data...")
+    train_processed = preprocess(train_df)
 
-        # Load interim train/test
-        train_data = pd.read_csv(os.path.join(BASE_DIR, 'data', 'interim', 'train.csv'))
-        test_data = pd.read_csv(os.path.join(BASE_DIR, 'data', 'interim', 'test.csv'))
-        logger.debug("Data loaded successfully from interim folder.")
+    logger.info("Preprocessing test data...")
+    test_processed = preprocess(test_df)
 
-        # Apply preprocessing
-        train_processed_data = normalize_text(train_data)
-        test_processed_data = normalize_text(test_data)
+    os.makedirs(processed_path, exist_ok=True)
+    train_processed.to_csv(processed_path / "train_preprocessed.csv", index=False)
+    test_processed.to_csv(processed_path / "test_preprocessed.csv", index=False)
 
-        # Save processed data
-        save_data(train_processed_data, test_processed_data, data_path=os.path.join(BASE_DIR, 'data'))
+    logger.info(f"Processed data saved in: {processed_path}")
+    logger.info("Data Preprocessing Stage Completed Successfully!")
 
-        logger.info("Data preprocessing completed successfully.")
-
-    except Exception as e:
-        logger.error(f"Failed to complete preprocessing: {e}")
-        print(f"Error: {e}")
-
-
-# Run Main
-
-if __name__ == '__main__':
+# ----------------------------
+if __name__ == "__main__":
     main()

@@ -4,6 +4,7 @@ stages:
     deps:
       - data/raw/youtube_bulk_raw.csv
       - src/data/data_ingestion.py
+      - params.yaml
     params:
       - data_ingestion.test_size
     outs:
@@ -12,60 +13,71 @@ stages:
   data_preprocessing:
     cmd: python src/data/data_preprocessing.py
     deps:
+      - src/data/data_preprocessing.py
       - data/interim/train.csv
       - data/interim/test.csv
-      - src/data/data_preprocessing.py
+      - params.yaml
+    params:
+      - data_preprocessing.remove_emojis
+      - data_preprocessing.min_word_count
+      - data_preprocessing.max_word_count
+      - data_preprocessing.sentiment_model_name
     outs:
       - data/processed
 
   feature_engineering:
-    cmd: python src/features/feature_engineering.py
+    cmd: python src/features/feature_engineering.py   
     deps:
-      - data/processed/train_processed.csv
-      - data/processed/test_processed.csv
       - src/features/feature_engineering.py
+      - data/processed/train_preprocessed.csv
+      - data/processed/test_preprocessed.csv
       - params.yaml
     params:
-      - feature_engineering.max_features
-      - feature_engineering.ngram_range
+      - feature_engineering.batch_size
     outs:
-      - data/features/train_features.pkl
-      - data/features/test_features.pkl
-      - data/features/tfidf_vectorizer.pkl
-      - data/features/scaler.pkl
+      - data/features   
 
   model_building:
     cmd: python src/model/model_building.py
     deps:
       - src/model/model_building.py
-      - data/features/train_features.pkl
-      - data/features/test_features.pkl
+      - data/features/features_train.npz
       - params.yaml
+      - requirements.txt
     params:
-      - model_building.model_type
-      - model_building.learning_rate
-      - model_building.max_depth
-      - model_building.n_estimators
-      - model_building.objective
-      - model_building.eval_metric
+      - model_building.random_state
+      - model_building.n_folds
+      - model_building.n_trials
+      - model_building.early_stopping_rounds
     outs:
-      - models/xgboost_best.pkl
-      - models/env/conda.yaml
-      - models/env/python_env.yaml
-      - models/env/requirements.txt
-      - confusion_matrix.png
-      - experiment_info.json
-    metrics:
-      - metrics.json:
-          cache: false 
-      
+      - models/lightgbm_best_model.pkl
+
   model_evaluation:
     cmd: python src/model/model_evaluation.py
     deps:
       - src/model/model_evaluation.py
-      - models/xgboost_best.pkl
-      - data/features/test_features.pkl
+      - models/lightgbm_best_model.pkl
+      - data/features/features_test.npz
       - params.yaml
     outs:
-      - reports/metrics.json
-      - reports/confusion_matrix.png
+      - artifacts/classification_report.json
+      - artifacts/confusion_matrix.png  
+
+  model_register:
+    cmd: python src/model/model_register.py
+    deps:
+      - src/model/model_register.py
+      - models/lightgbm_best_model.pkl
+      - params.yaml
+    params:
+      - model_register.model_name
+      - model_register.mlflow_tracking_uri
+      - model_register.mlflow_experiment_name
+      - model_register.model_version_file
+    outs:
+      - models/model_version.json  
+
+
+
+   
+  

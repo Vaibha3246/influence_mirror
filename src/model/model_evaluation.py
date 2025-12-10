@@ -1,128 +1,131 @@
 import os
-import joblib
-import yaml
-import logging
-import numpy as np
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-import seaborn as sns
-import matplotlib.pyplot as plt
-import mlflow
-import dagshub
 import json
+import numpy as np
+import joblib
+import mlflow
+import mlflow.lightgbm
+import logging
+import yaml
+import pandas as pd
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    classification_report
+)
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Initialize MLflow tracking
-dagshub.init(repo_owner='Vaibha3246', repo_name='influence_mirror', mlflow=True)
-mlflow.set_tracking_uri("https://dagshub.com/Vaibha3246/influence_mirror.mlflow")
-
-# Logging setup
+# -------------------------
+# Logging Setup
+# -------------------------
 logger = logging.getLogger("model_evaluation")
 logger.setLevel(logging.INFO)
-if not logger.handlers:
-    stream = logging.StreamHandler()
-    fmt = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    stream.setFormatter(fmt)
-    logger.addHandler(stream)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
+# -------------------------
+# Load params.yaml
+# -------------------------
+with open("params.yaml") as f:
+    params = yaml.safe_load(f)["model_evaluation"]
 
-def get_root_dir():
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+MODEL_DIR = params["model_dir"]
+MLFLOW_TRACKING_URI = params["mlflow_tracking_uri"]
+MLFLOW_EXPERIMENT_NAME = params["mlflow_experiment_name"]
 
+# -------------------------
+# Load Feature Engineered Test Data
+# -------------------------
+def load_test_features():
+    logger.info("Loading test features...")
+    test_data = np.load("data/features/features_test.npz")
+    X_test, y_test = test_data["X"], test_data["y"]
+    logger.info(f"Test shape: {X_test.shape}, Labels: {len(y_test)}")
+    return X_test, y_test
 
-def load_yaml(path):
-    with open(path, "r") as f:
-        return yaml.safe_load(f)
+# -------------------------
+# Load Model
+# -------------------------
+def load_model():
+    model_path = os.path.join(MODEL_DIR, "lightgbm_best_model.pkl")
+    logger.info(f"Loading saved trained model: {model_path}")
+    return joblib.load(model_path)
 
+# -------------------------
+# Save Confusion Matrix Plot
+# -------------------------
+def save_confusion_matrix(y_true, y_pred):
+    logger.info("Generating confusion matrix plot...")
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(6, 4))
+    sns.heatmap(cm, annot=True, fmt="g")
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title("Confusion Matrix")
 
+    cm_path = "artifacts/confusion_matrix.png"
+    os.makedirs("artifacts", exist_ok=True)
+    plt.savefig(cm_path)
+    plt.close()
+    return cm_path
+
+# -------------------------
+# Main Evaluation
+# -------------------------
 def main():
-    root = get_root_dir()
-    cfg = load_yaml(os.path.join(root, "params.yaml")).get("model_evaluation", {})
 
-    # Load test features
-    feature_dir = os.path.join(root, "data", "features")
-    test_data_path = os.path.join(feature_dir, "test_features.pkl")
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
 
-    if not os.path.exists(test_data_path):
-        logger.error(f" Test feature file not found at: {test_data_path}")
-        return
+    X_test, y_test = load_test_features()
+    model = load_model()
 
-    test_data = joblib.load(test_data_path)
-    X_test, y_test = test_data["X"], np.asarray(test_data["y"])
+    logger.info("Starting model evaluation...")
 
-    # Check label distribution
-    print("\n Checking label distribution in test set...")
-    unique, counts = np.unique(y_test, return_counts=True)
-    for u, c in zip(unique, counts):
-        print(f"  Label {u}: {c} samples")
-
-    # Load trained model
-    model_path = os.path.join(root, "models", "xgboost_best.pkl")
-    if not os.path.exists(model_path):
-        logger.error(f" Model file not found at: {model_path}")
-        return
-
-    model = joblib.load(model_path)
-    logger.info(f" Loaded trained model from {model_path}")
-
-    # Make predictions
-    logger.info(" Running predictions on test set...")
     y_pred = model.predict(X_test)
 
-    # Debug info
-    unique_preds, pred_counts = np.unique(y_pred, return_counts=True)
-    print("\n Unique predictions and counts:")
-    for u, c in zip(unique_preds, pred_counts):
-        print(f"  Predicted {u}: {c} samples")
+    # Metrics
+    results = {
+        "accuracy": accuracy_score(y_test, y_pred),
+        "macro_precision": precision_score(y_test, y_pred, average="macro"),
+        "macro_recall": recall_score(y_test, y_pred, average="macro"),
+        "macro_f1": f1_score(y_test, y_pred, average="macro")
+    }
 
-    print("\n Sample comparison:")
-    print("First 20 predictions:", y_pred[:20])
-    print("First 20 actual labels:", y_test[:20])
+    logger.info(f"Evaluation Results: {results}")
 
-    # Handle unseen labels
-    unseen_labels = [label for label in np.unique(y_pred) if label not in np.unique(y_test)]
-    if unseen_labels:
-        logger.warning(f" Unseen predicted labels detected: {unseen_labels}")
+    # Save classification report
+    class_report = classification_report(y_test, y_pred, output_dict=True)
+    report_path = "artifacts/classification_report.json"
+    with open(report_path, "w") as f:
+        json.dump(class_report, f, indent=4)
 
-    # Compute metrics
-    acc = accuracy_score(y_test, y_pred)
-    report = classification_report(y_test, y_pred, output_dict=True)
-    cm = confusion_matrix(y_test, y_pred)
+    # Confusion Matrix & Save
+    cm_path = save_confusion_matrix(y_test, y_pred)
 
-    # Create reports directory
-    reports_dir = os.path.join(root, "reports")
-    os.makedirs(reports_dir, exist_ok=True)
+    # MLflow Logging
+    with mlflow.start_run(run_name="model_evaluation_sbert_lgbm"):
+        for metric, value in results.items():
+            mlflow.log_metric(metric, value)
 
-    # Log to MLflow
-    mlflow.set_experiment(cfg.get("mlflow_experiment", "influence_mirror"))
-    with mlflow.start_run(run_name="model_evaluation"):
-        mlflow.log_metric("test_accuracy", acc)
+        # Log class-wise metrics
+        for cls, scores in class_report.items():
+            if cls.isdigit() or cls.startswith("-"):  # Only class labels
+                mlflow.log_metric(f"{cls}_precision", scores["precision"])
+                mlflow.log_metric(f"{cls}_recall", scores["recall"])
+                mlflow.log_metric(f"{cls}_f1", scores["f1-score"])
+    
 
-        for label, metrics in report.items():
-            if isinstance(metrics, dict):
-                for k, v in metrics.items():
-                    mlflow.log_metric(f"{label}_{k}", float(v))
-
-        # Save and log confusion matrix
-        plt.figure(figsize=(6, 5))
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
-        plt.title("Confusion Matrix - Model Evaluation")
-        plt.xlabel("Predicted")
-        plt.ylabel("Actual")
-        plt.tight_layout()
-
-        cm_path = os.path.join(reports_dir, "confusion_matrix.png")
-        plt.savefig(cm_path)
+        mlflow.log_artifact(report_path)
         mlflow.log_artifact(cm_path)
-        plt.close()
 
-        # Save metrics.json for DVC tracking
-        metrics_path = os.path.join(reports_dir, "metrics.json")
-        with open(metrics_path, "w") as f:
-            json.dump({"test_accuracy": float(acc)}, f, indent=4)
-        mlflow.log_artifact(metrics_path)
-
-    logger.info(f" Model evaluation completed successfully | Test Accuracy: {acc:.4f}")
-    logger.info(f" Saved metrics report to {metrics_path}")
-
+    logger.info("Model Evaluation Completed & Logged Successfully!")
 
 if __name__ == "__main__":
     main()

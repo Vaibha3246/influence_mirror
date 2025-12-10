@@ -1,0 +1,9 @@
+digest: 24218f4f
+name: dataset
+profile: '{"features_shape": [6629, 10025], "features_size": 66455725, "features_nbytes":
+  531645800}'
+schema: '{"mlflow_tensorspec": {"features": "[{\"type\": \"tensor\", \"tensor-spec\":
+  {\"dtype\": \"float64\", \"shape\": [-1, 10025]}}]", "targets": null}}'
+source: '{"tags": {"mlflow.user": "DELL", "mlflow.source.name": "src/model/model_building.py",
+  "mlflow.source.type": "LOCAL", "mlflow.source.git.commit": "eacccd63db3a662bb1d537e7ef855eca72560228"}}'
+source_type: code
