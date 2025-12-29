@@ -23,7 +23,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}-${{ github.run_number }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -33,16 +33,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install --no-cache-dir -r requirements.txt
 
-       # Optional: Explicit DVC install (safe)
+      # 5 Ensure DVC is installed
       - name: Ensure DVC is installed
-        run: pip install "dvc[s3]"   
+        run: pip install "dvc[s3]"
 
-
-      # 5 Run DVC pipeline (AWS credentials needed)
+      # 6 Run DVC pipeline (AWS credentials needed)
       - name: Run pipeline
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: eu-north-1
-        run: |
-          dvc repro
+        run: dvc repro
