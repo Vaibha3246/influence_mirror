@@ -16,6 +16,7 @@ stages:
       - src/data/data_preprocessing.py
       - data/interim/train.csv
       - data/interim/test.csv
+      - config/slang_dict.json
       - params.yaml
     params:
       - data_preprocessing.remove_emojis

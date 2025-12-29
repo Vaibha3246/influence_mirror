@@ -9,80 +9,84 @@ stages:
       size: 8004127
     - path: params.yaml
       hash: md5
-      md5: 51a98208deac21bd3777486ffdab5cdb
-      size: 1340
+      md5: adb6ecbd870bc51ca1377a0259538c8f
+      size: 1379
     - path: src/data/data_ingestion.py
       hash: md5
-      md5: 19966ba3fb0da1740ff1078a8d73fb37
-      size: 1834
+      md5: 6c020c6f4e39e7ce5e61987324931330
+      size: 1743
     params:
       params.yaml:
         data_ingestion.test_size: 0.2
     outs:
     - path: data/interim
       hash: md5
-      md5: 508e4a18df58645cf7eb80ab3e601179.dir
-      size: 3371444
+      md5: 35a431c831ac3a492c824304b0873915.dir
+      size: 6276398
       nfiles: 2
   data_preprocessing:
     cmd: python src/data/data_preprocessing.py
     deps:
+    - path: config/slang_dict.json
+      hash: md5
+      md5: 6fea90920b4ccfe93f45cb687ab349a7
+      size: 1960
     - path: data/interim/test.csv
       hash: md5
-      md5: 5f834b341513f870d7219e8ca256cff1
-      size: 675588
+      md5: dccf1bb33f6f569bfd053fab3cde2c14
+      size: 1260002
     - path: data/interim/train.csv
       hash: md5
-      md5: 54b8ed8af92dc0590ef6581e7383ca73
-      size: 2695856
+      md5: f1a18834378e17ac5366600d61f4855e
+      size: 5016396
     - path: params.yaml
       hash: md5
-      md5: 51a98208deac21bd3777486ffdab5cdb
-      size: 1340
+      md5: adb6ecbd870bc51ca1377a0259538c8f
+      size: 1379
     - path: src/data/data_preprocessing.py
       hash: md5
-      md5: 57650a1e3341e2ffb14dc10bfa1b9506
-      size: 5239
+      md5: 23df299e01a85984dc847927eee01282
+      size: 5315
     params:
       params.yaml:
-        data_preprocessing.max_word_count: 100
-        data_preprocessing.min_word_count: 2
+        data_preprocessing.max_word_count: 200
+        data_preprocessing.min_word_count: 1
         data_preprocessing.remove_emojis: false
         data_preprocessing.sentiment_model_name: 
           cardiffnlp/twitter-roberta-base-sentiment-latest
     outs:
     - path: data/processed
       hash: md5
-      md5: 697b91ad78ee59e0038edcfeaf6f5057.dir
-      size: 5926247
+      md5: 81da059c905c59f4b5f6263e5386ac8a.dir
+      size: 8351603
       nfiles: 2
   feature_engineering:
     cmd: python src/features/feature_engineering.py
     deps:
     - path: data/processed/test_preprocessed.csv
       hash: md5
-      md5: 873dc85c0ad3e6f51107d411a65e749c
-      size: 1185550
+      md5: 794e64a1776218a1c086cd9e0af89ac1
+      size: 1704228
     - path: data/processed/train_preprocessed.csv
       hash: md5
-      md5: f02a5f0906ca3d1af731a00dc3164414
-      size: 4740697
+      md5: c8170b794b4a050b4f14b72a403cec5e
+      size: 6647375
     - path: params.yaml
       hash: md5
-      md5: 51a98208deac21bd3777486ffdab5cdb
-      size: 1340
+      md5: adb6ecbd870bc51ca1377a0259538c8f
+      size: 1379
     - path: src/features/feature_engineering.py
       hash: md5
-      md5: 5fdda465c62314d11d6fcece9e4f4ffc
-      size: 6139
+      md5: 2960848f9475154ded157b3e9604c502
+      size: 7729
     params:
       params.yaml:
         feature_engineering.batch_size: 256
     outs:
     - path: data/features
       hash: md5
-      md5: 966e48a884fbc476f6700039744f796c.dir
-      size: 250912684
+      md5: 1c620d4cde24cb11cdaeed64789dcf47.dir
+      size: 274281948
       nfiles: 6
   register_model:
     cmd: python src/model/register_model.py
@@ -105,49 +109,49 @@ stages:
     deps:
     - path: data/features/features_test.npz
       hash: md5
-      md5: 29e423e23c0dc44350653cf8795d171d
-      size: 31789130
+      md5: f14f607536406e94805348643a3fd509
+      size: 36595450
     - path: models/lightgbm_best_model.pkl
       hash: md5
-      md5: 0309824506ff517a58d8197bf2570144
-      size: 30520268
+      md5: 59a2e6670112d516a55ee3e2c6e6eec2
+      size: 3859596
     - path: params.yaml
       hash: md5
-      md5: 51a98208deac21bd3777486ffdab5cdb
-      size: 1340
+      md5: adb6ecbd870bc51ca1377a0259538c8f
+      size: 1379
     - path: src/model/model_evaluation.py
       hash: md5
-      md5: 15601d96bde8a527eb7003aad3142626
-      size: 4078
+      md5: 033772024938e1ee649aed6fc20f7552
+      size: 4643
     outs:
     - path: artifacts/classification_report.json
       hash: md5
-      md5: ad0f372c98b43b6c2c8a335b9ff33d01
-      size: 901
+      md5: 61a6be9a34b7aba9763725a8750a1af9
+      size: 905
     - path: artifacts/confusion_matrix.png
       hash: md5
-      md5: 050055f27f21900e81071365967e2181
-      size: 19870
+      md5: 8a4cbe9a7c9ec4b336586f69181f3813
+      size: 22152
   model_register:
     cmd: python src/model/model_register.py
     deps:
     - path: models/lightgbm_best_model.pkl
       hash: md5
-      md5: 0309824506ff517a58d8197bf2570144
-      size: 30520268
+      md5: 59a2e6670112d516a55ee3e2c6e6eec2
+      size: 3859596
     - path: params.yaml
       hash: md5
-      md5: 51a98208deac21bd3777486ffdab5cdb
-      size: 1340
+      md5: adb6ecbd870bc51ca1377a0259538c8f
+      size: 1379
     - path: src/model/model_register.py
       hash: md5
-      md5: 573c1b8ad860091e13f7a56026497e09
-      size: 3099
+      md5: 9553a0415a1c9a13851656f8d254fe51
+      size: 3253
     params:
       params.yaml:
         model_register.mlflow_experiment_name: dvc_stage_sbert_lightgbm_hybrid
         model_register.mlflow_tracking_uri: 
-          http://ec2-13-49-76-135.eu-north-1.compute.amazonaws.com:5000/
+          http://ec2-13-62-47-8.eu-north-1.compute.amazonaws.com:5000/
         model_register.model_name: yt_chrome_plugin_model
         model_register.model_version_file: models/model_version.json
     outs:
@@ -160,28 +164,28 @@ stages:
     deps:
     - path: data/features/features_train.npz
       hash: md5
-      md5: 0e05049cf78db3b4e4bc70254059f9e1
-      size: 127725698
+      md5: 22c985b1eb679ad63557c81f73351924
+      size: 146288490
     - path: params.yaml
       hash: md5
-      md5: 51a98208deac21bd3777486ffdab5cdb
-      size: 1340
+      md5: adb6ecbd870bc51ca1377a0259538c8f
+      size: 1379
     - path: requirements.txt
       hash: md5
       md5: 20e7af55a2b5d7adf997ce43d834c026
       size: 11322
     - path: src/model/model_building.py
       hash: md5
-      md5: cb3054d0663ca411b47f507f4d0b8454
-      size: 5701
+      md5: d0d67b5ce08317ddde8805b6beb25acf
+      size: 5899
     params:
       params.yaml:
         model_building.early_stopping_rounds: 50
         model_building.n_folds: 3
-        model_building.n_trials: 50
+        model_building.n_trials: 25
         model_building.random_state: 42
     outs:
     - path: models/lightgbm_best_model.pkl
       hash: md5
-      md5: 0309824506ff517a58d8197bf2570144
-      size: 30520268
+      md5: 59a2e6670112d516a55ee3e2c6e6eec2
+      size: 3859596

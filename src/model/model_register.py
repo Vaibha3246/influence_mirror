@@ -35,27 +35,30 @@ file_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
-
 def get_latest_run_id():
-    """Fetch the latest MLflow run ID from experiment"""
     client = MlflowClient()
     experiment = client.get_experiment_by_name(EXPERIMENT_NAME)
 
     if not experiment:
-        raise ValueError(f"Experiment '{EXPERIMENT_NAME}' not found in MLflow!")
+        raise ValueError(f"Experiment '{EXPERIMENT_NAME}' not found")
 
     runs = client.search_runs(
         experiment_ids=[experiment.experiment_id],
         order_by=["attributes.end_time DESC"],
-        max_results=1,
+        max_results=20,
     )
 
-    if not runs:
-        raise ValueError("No MLflow runs found for model registration!")
+    for run in runs:
+        run_id = run.info.run_id
+        model_uri = f"runs:/{run_id}/model"
+        try:
+            mlflow.models.get_model_info(model_uri)
+            logger.info(f"Found valid model in run: {run_id}")
+            return run_id
+        except Exception:
+            continue
 
-    latest_run = runs[0]
-    return latest_run.info.run_id
-
+    raise RuntimeError("No MLflow run contains a valid logged model")
 
 def register_model(model_name: str):
     """Register the latest trained model into MLflow Model Registry"""

@@ -24,7 +24,6 @@ def load_data(path):
 def preprocess_data(df):
     if "text" not in df.columns:
         raise KeyError("Missing required column: text")
-    df = df.drop(columns=['author', 'video_id', 'likes','published_at'], errors='ignore')
     df = df.dropna()
     df = df.drop_duplicates(subset=['text'], keep='first')
     df = df[df['text'].str.strip() != ""]

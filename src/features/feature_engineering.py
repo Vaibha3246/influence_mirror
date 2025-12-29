@@ -12,6 +12,8 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from nrclex import NRCLex
 import joblib
 import json
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 # -----------------------------
 # Logger setup
@@ -35,6 +37,7 @@ output_path = BASE / params["output_path"]
 
 BATCH_SIZE = params["batch_size"]
 SBERT_MODEL = "all-MiniLM-L6-v2"
+ROBERTA_MODEL_NAME = "cardiffnlp/twitter-roberta-base-sentiment-latest"
 
 # -----------------------------
 # Download stopwords
@@ -43,34 +46,39 @@ nltk.download("stopwords")
 stop_words = set(stopwords.words("english"))
 
 # -----------------------------
+# Load RoBERTa for sentiment probs
+# -----------------------------
+device = "cuda" if torch.cuda.is_available() else "cpu"
+tokenizer_roberta = AutoTokenizer.from_pretrained(ROBERTA_MODEL_NAME)
+model_roberta = AutoModelForSequenceClassification.from_pretrained(ROBERTA_MODEL_NAME).to(device)
+model_roberta.eval()
+LABELS = ["negative", "neutral", "positive"]
+
+# -----------------------------
 # Feature functions
 # -----------------------------
 def add_numeric_features(df):
     df['num_stop_words'] = df['text_clean'].apply(lambda x: len([w for w in x.split() if w in stop_words]))
     df['num_chars'] = df['text_clean'].apply(len)
-    df['num_punctuation_chars'] = df['text_clean'].apply(lambda x: sum([1 for c in x if c in '.,!?;:"\'()[]{}-']))
+    df['num_words'] = df['text_clean'].apply(lambda x: len(x.split()))
+    df['num_exclamation'] = df['text_clean'].apply(lambda x: x.count('!'))
+    df['num_question'] = df['text_clean'].apply(lambda x: x.count('?'))
+    df['num_emojis'] = df['text_clean'].apply(lambda x: len([c for c in x if c in ":;=()😂🤣😍😭😊👍💔❤️🔥💯😎😢😡🤔🎉✨"] ))
+    df['num_punctuation'] = df['text_clean'].apply(lambda x: sum([1 for c in x if c in '.,!?;:"\'()[]{}-']))
     return df
 
 def add_category_features(df, ohe=None, fit_ohe=True):
     if 'category' not in df.columns:
         return df, ohe
-
     if ohe is None:
-        try:
-            ohe = OneHotEncoder(sparse_output=False, drop="first", handle_unknown="ignore")
-        except TypeError:
-            ohe = OneHotEncoder(sparse=False, drop="first", handle_unknown="ignore")
-
+        ohe = OneHotEncoder(sparse_output=False, drop="first", handle_unknown="ignore")
     if fit_ohe:
         cat_encoded = ohe.fit_transform(df[['category']])
     else:
         cat_encoded = ohe.transform(df[['category']])
-
     cat_df = pd.DataFrame(cat_encoded, columns=ohe.get_feature_names_out(['category']))
     df = pd.concat([df.reset_index(drop=True), cat_df.reset_index(drop=True)], axis=1)
     return df, ohe
-
-
 
 def get_emotion_scores(text):
     emotions = NRCLex(text)
@@ -83,65 +91,76 @@ def get_emotion_scores(text):
         all_emotions.update(probs)
     return all_emotions
 
+def get_roberta_probs(texts, batch_size=32):
+    """Return RoBERTa sentiment probabilities as features"""
+    probs_list = []
+    for i in tqdm(range(0, len(texts), batch_size), desc="RoBERTa Prob Batches"):
+        batch = texts[i:i+batch_size]
+        try:
+            tokens = tokenizer_roberta(batch, return_tensors="pt", padding=True, truncation=True, max_length=512)
+            tokens = {k:v.to(device) for k,v in tokens.items()}
+            with torch.no_grad():
+                outputs = model_roberta(**tokens)
+                probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()
+            probs_list.append(probs)
+        except:
+            # fallback neutral probs
+            probs_list.append(np.array([[0.0,1.0,0.0]]*len(batch)))
+    return np.vstack(probs_list)
+
 # -----------------------------
 # Feature creation
 # -----------------------------
 def create_features(df, sbert=None, scaler=None, ohe=None, fit_scaler=True, fit_ohe=True):
-    df = df.dropna(subset=['text_clean', 'sentiment_numeric']).reset_index(drop=True)
+
+    # Sentiment numeric mapping
+    if 'sentiment_numeric' not in df.columns and 'sentiment' in df.columns:
+        df['sentiment_numeric'] = df['sentiment'].map({'negative':0,'neutral':1,'positive':2})
+
+    df = df.dropna(subset=['text_clean']).reset_index(drop=True)
     logger.info(f"Rows after cleaning: {df.shape[0]}")
 
     # Numeric features
     df = add_numeric_features(df)
-
     # Category features
     df, ohe = add_category_features(df, ohe=ohe, fit_ohe=fit_ohe)
-
-    # NRC emotion features
-    logger.info("Extracting NRC emotion features...")
-    emotion_features = df['text_clean'].apply(get_emotion_scores)
-    emotion_df = pd.DataFrame(list(emotion_features))
+    # Emotion features
+    emotion_df = pd.DataFrame(list(df['text_clean'].apply(get_emotion_scores)))
     df = pd.concat([df, emotion_df], axis=1)
 
     # Labels
-    y = df['sentiment_numeric'].astype(int).to_numpy()
+    y = df['sentiment_numeric'].astype(int).to_numpy() if 'sentiment_numeric' in df.columns else None
 
-    # Drop non-feature columns
-    drop_cols = ['text', 'sentiment', 'category', 'sentiment_numeric']
-    df = df.drop(columns=[c for c in drop_cols if c in df.columns])
+    # Save text_clean separately for embedding
+    texts = df['text_clean'].astype(str).tolist()
+    df = df.drop(columns=['text_clean', 'text', 'sentiment', 'category', 'sentiment_numeric'], errors='ignore')
 
     # SBERT embeddings
     if sbert is None:
         logger.info(f"Loading SBERT model: {SBERT_MODEL}")
         sbert = SentenceTransformer(SBERT_MODEL)
 
-    texts = df['text_clean'].astype(str).tolist()
-    df = df.drop(columns=['text_clean'])
-
-    logger.info("Generating SBERT embeddings…")
     embeddings = []
-    for i in tqdm(range(0, len(texts), BATCH_SIZE)):
-        batch = texts[i:i + BATCH_SIZE]
+    for i in tqdm(range(0, len(texts), BATCH_SIZE), desc="SBERT Embeddings"):
+        batch = texts[i:i+BATCH_SIZE]
         emb = sbert.encode(batch, convert_to_numpy=True)
         embeddings.append(emb)
     embeddings = np.vstack(embeddings)
+
+    # RoBERTa sentiment probabilities
+    roberta_probs = get_roberta_probs(texts, batch_size=BATCH_SIZE)
 
     # Scale numeric features
     X_num = df.to_numpy()
     if scaler is None:
         scaler = StandardScaler(with_mean=False)
-    if fit_scaler:
-        X_num_scaled = scaler.fit_transform(X_num)
-    else:
-        X_num_scaled = scaler.transform(X_num)
+    X_num_scaled = scaler.fit_transform(X_num) if fit_scaler else scaler.transform(X_num)
 
-    # Combine embeddings + numeric features
-    X = np.hstack([embeddings, X_num_scaled])
-    logger.info(f"Final shape → X: {X.shape}, y: {y.shape}")
+    # Combine: SBERT + numeric + RoBERTa probs
+    X = np.hstack([embeddings, X_num_scaled, roberta_probs])
+    logger.info(f"Final shape → X: {X.shape}, y: {None if y is None else y.shape}")
 
-    # Save numeric column names for API use
-    numeric_cols = df.columns.tolist()
-
-    return X, y, sbert, scaler, ohe, numeric_cols
+    return X, y, sbert, scaler, ohe, df.columns.tolist()
 
 # -----------------------------
 # Main
@@ -153,20 +172,17 @@ def main():
 
     # Train features
     X_train, y_train, sbert, scaler, ohe, numeric_cols = create_features(train_df)
+    # Test features
+    X_test, y_test, *_ = create_features(test_df, sbert=sbert, scaler=scaler, ohe=ohe, fit_scaler=False, fit_ohe=False)
 
-    # Test features using same SBERT, scaler, OHE
-    X_test, y_test, *_ = create_features(test_df, sbert=sbert, scaler=scaler, ohe=ohe,
-                                         fit_scaler=False, fit_ohe=False)
-
-    # Save features and artifacts
+    # Save artifacts
     os.makedirs(output_path, exist_ok=True)
     np.savez(output_path / "features_train.npz", X=X_train, y=y_train)
     np.savez(output_path / "features_test.npz", X=X_test, y=y_test)
-
     joblib.dump(sbert, output_path / "sbert_model.pkl")
     joblib.dump(scaler, output_path / "scaler.pkl")
     joblib.dump(ohe, output_path / "ohe.pkl")
-    json.dump(numeric_cols, open(output_path / "numeric_cols.json", "w"))
+    json.dump(numeric_cols, open(output_path / "numeric_cols.json","w"))
 
     logger.info(f"Saved features and artifacts to {output_path}")
     logger.info("Feature Engineering Completed Successfully!")

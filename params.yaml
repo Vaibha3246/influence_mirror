@@ -9,8 +9,10 @@ data_preprocessing:
   output_path: data/processed
   remove_emojis: false
   sentiment_model_name: cardiffnlp/twitter-roberta-base-sentiment-latest
-  min_word_count: 2
-  max_word_count: 100
+  min_word_count: 1
+  max_word_count: 200
+  slang_json: "config/slang_dict.json"   
+
 
 feature_engineering:
   train_processed: "data/processed/train_preprocessed.csv"
@@ -21,21 +23,21 @@ feature_engineering:
 model_building:
   random_state: 42
   n_folds: 3
-  n_trials: 50
+  n_trials: 25
   early_stopping_rounds: 50
   model_dir: "models"
-  mlflow_tracking_uri: "http://ec2-13-49-76-135.eu-north-1.compute.amazonaws.com:5000/"
+  mlflow_tracking_uri: "http://ec2-13-62-47-8.eu-north-1.compute.amazonaws.com:5000/"
   mlflow_experiment_name: "dvc_stage_sbert_lightgbm_hybrid"
 
 model_evaluation:
   model_dir: "models"
-  mlflow_tracking_uri: "http://ec2-13-49-76-135.eu-north-1.compute.amazonaws.com:5000/"
+  mlflow_tracking_uri: "http://ec2-13-62-47-8.eu-north-1.compute.amazonaws.com:5000/"
   mlflow_experiment_name: "dvc_stage_sbert_lightgbm_hybrid"
 
 model_register:
   model_dir: models
   model_name: "yt_chrome_plugin_model"
-  mlflow_tracking_uri: "http://ec2-13-49-76-135.eu-north-1.compute.amazonaws.com:5000/"
+  mlflow_tracking_uri: "http://ec2-13-62-47-8.eu-north-1.compute.amazonaws.com:5000/"
   mlflow_experiment_name: "dvc_stage_sbert_lightgbm_hybrid"
   model_version_file: "models/model_version.json"
 
