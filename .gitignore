@@ -1,81 +1,73 @@
-
+# ===============================
 # Python
+# ===============================
 __pycache__/
 *.py[cod]
 *.so
 
-
-# Packaging / Virtual Env
-
-.Python
+# ===============================
+# Virtual Environments
+# ===============================
 env/
 .venv/
+.Python
 build/
 dist/
 *.egg-info/
 .eggs/
 
-
-# Logs & caches
-
+# ===============================
+# Logs & Cache
+# ===============================
 *.log
 .cache/
 .mypy_cache/
 .pytest_cache/
 
+# ===============================
 # IDEs
+# ===============================
 .idea/
 .vscode/
 .spyproject/
 
-
+# ===============================
 # Jupyter
-
+# ===============================
 .ipynb_checkpoints/
 
-
-# Environment variables
+# ===============================
+# Environment Variables
+# ===============================
 .env
 
-# OS files
-
+# ===============================
+# OS
+# ===============================
 .DS_Store
 
-# DATA (DVC controlled)
-
+# ===============================
+# DVC Controlled Data
+# ===============================
 /data/*
 !/data/*.dvc
 
-
-# MODELS & ARTIFACTS (DVC controlled)
-notebooks/*.pkl
-notebooks/mlruns/
-!notebooks/*.dvc
-
-# DVC internals
-
-.dvc/cache/
-
-
-# Model files (DO NOT PUSH)
-
+# ===============================
+# Models & Artifacts (NEVER PUSH)
+# ===============================
 *.pkl
 *.joblib
 *.h5
 *.pt
 *.bin
 
-# Data files
-
-data/
-*.csv
-*.parquet
-
+# ===============================
+# MLflow
+# ===============================
+mlruns/
 mlflow.db
 
-!/data/raw/youtube_bulk_raw.csv.dvc
-
-# Ignore everything in notebooks except DVC-tracked files
-notebooks/*.pkl
-notebooks/models/
-mlruns/
+# ===============================
+# DVC internals
+# ===============================
+.dvc/cache/
