@@ -33,6 +33,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install --no-cache-dir -r requirements.txt
 
+       # Optional: Explicit DVC install (safe)
+      - name: Ensure DVC is installed
+        run: pip install "dvc[s3]"   
+
 
       # 5 Run DVC pipeline (AWS credentials needed)
       - name: Run pipeline
