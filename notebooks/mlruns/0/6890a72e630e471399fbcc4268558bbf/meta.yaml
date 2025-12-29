@@ -1,0 +1,14 @@
+artifact_uri: file:///e:/mlops_projects/influence_mirror/notebooks/mlruns/0/6890a72e630e471399fbcc4268558bbf/artifacts
+end_time: 1764063993685
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 6890a72e630e471399fbcc4268558bbf
+run_name: XGB_(1, 1)_oversampling
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1764063800544
+status: 3
+tags: []
+user_id: DELL

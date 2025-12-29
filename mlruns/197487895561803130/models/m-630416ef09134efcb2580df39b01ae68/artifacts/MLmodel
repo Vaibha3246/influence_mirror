@@ -1,0 +1,31 @@
+artifact_path: file:///E:/mlops_projects/influence_mirror/mlruns/197487895561803130/models/m-630416ef09134efcb2580df39b01ae68/artifacts
+flavors:
+  lightgbm:
+    code: null
+    data: model.pkl
+    lgb_version: 4.6.0
+    model_class: lightgbm.sklearn.LGBMClassifier
+  python_function:
+    data: model.pkl
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.lightgbm
+    python_version: 3.13.9
+is_signature_from_type_hint: false
+mlflow_version: 3.5.0
+model_id: m-630416ef09134efcb2580df39b01ae68
+model_size_bytes: 2321711
+model_uuid: m-630416ef09134efcb2580df39b01ae68
+prompts: null
+run_id: f96235f66a634767bfc6f8e6215cfcaa
+saved_input_example_info:
+  artifact_path: input_example.json
+  serving_input_path: serving_input_example.json
+  type: sparse_matrix_csr
+signature:
+  inputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float64", "shape": [-1, 10025]}}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "int64", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2025-11-08 09:14:44.781962'

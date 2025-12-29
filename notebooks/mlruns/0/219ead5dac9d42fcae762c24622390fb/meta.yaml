@@ -1,0 +1,14 @@
+artifact_uri: file:///e:/mlops_projects/influence_mirror/notebooks/mlruns/0/219ead5dac9d42fcae762c24622390fb/artifacts
+end_time: 1764062382403
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 219ead5dac9d42fcae762c24622390fb
+run_name: SVM_(1, 2)_undersampling
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1764062374009
+status: 3
+tags: []
+user_id: DELL

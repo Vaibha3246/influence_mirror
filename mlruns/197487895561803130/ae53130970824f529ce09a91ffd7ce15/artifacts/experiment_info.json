@@ -1,0 +1,9 @@
+{
+    "run_id": "ae53130970824f529ce09a91ffd7ce15",
+    "model_uri": "runs:/ae53130970824f529ce09a91ffd7ce15/lightgbm_best",
+    "vectorizer_uri": "runs:/ae53130970824f529ce09a91ffd7ce15/tfidf_vectorizer/tfidf_vectorizer.pkl",
+    "metrics": {
+        "test_acc": 0.9933076225045372
+    },
+    "created_at": "2025-11-14T14:16:52.963320"
+}

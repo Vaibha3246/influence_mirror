@@ -1,0 +1,14 @@
+artifact_uri: file:e:/mlops_projects/influence_mirror/notebooks/mlruns/795307124899152337/432d2a404f5448099332c5682e284206/artifacts
+end_time: 1764740339500
+entry_point_name: ''
+experiment_id: '795307124899152337'
+lifecycle_stage: active
+run_id: 432d2a404f5448099332c5682e284206
+run_name: Exp9_SBERT_LGBM_HYBRID
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1764740328246
+status: 3
+tags: []
+user_id: DELL

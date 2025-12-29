@@ -1,0 +1,14 @@
+artifact_uri: file:///e:/mlops_projects/influence_mirror/notebooks/mlruns/0/531eb4911e0746ac80c567140bad7301/artifacts
+end_time: 1764063719832
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 531eb4911e0746ac80c567140bad7301
+run_name: XGB_(1, 1)_class_weight
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1764063491080
+status: 3
+tags: []
+user_id: DELL
