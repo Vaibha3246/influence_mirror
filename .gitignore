@@ -1,88 +1,75 @@
-# Byte-compiled / optimized / DLL files
+
+# Python
 __pycache__/
 *.py[cod]
-
-# C extensions
 *.so
 
-# Distribution / packaging
+
+# Packaging / Virtual Env
+
 .Python
 env/
+.venv/
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
 *.egg-info/
-.installed.cfg
-*.egg
+.eggs/
 
-# PyInstaller
-*.manifest
-*.spec
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+# Logs & caches
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
 *.log
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# DotEnv configuration
-.env
-
-# Database
-*.db
-*.rdb
+.cache/
+.mypy_cache/
+.pytest_cache/
 
 # IDEs
-.idea
+.idea/
 .vscode/
 .spyproject/
 
-# Jupyter NB Checkpoints
+
+# Jupyter
+
 .ipynb_checkpoints/
 
-# Data: ignore raw data, track DVC files
-/data/*
-!data/*.dvc
 
-# Notebooks: ignore models, track DVC files if any
-notebooks/*.pkl
-!notebooks/*.dvc
+# Environment variables
+.env
 
-# Mac OS-specific storage files
+# OS files
+
 .DS_Store
 
-# Vim swap files
-*.swp
-*.swo
+# DATA (DVC controlled)
 
-# Mypy cache
-.mypy_cache/
+/data/*
+!/data/*.dvc
+
+
+# MODELS & ARTIFACTS (DVC controlled)
+notebooks/*.pkl
+notebooks/mlruns/
+!notebooks/*.dvc
+
+# DVC internals
+
+.dvc/cache/
+
+
+# Model files (DO NOT PUSH)
+
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.bin
+
+# Data files
+
+data/
+*.csv
+*.parquet
+
+mlflow.db
+
