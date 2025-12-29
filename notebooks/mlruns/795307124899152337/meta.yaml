@@ -1,6 +1,0 @@
-artifact_location: file:e:/mlops_projects/influence_mirror/notebooks/mlruns/795307124899152337
-creation_time: 1764740326992
-experiment_id: '795307124899152337'
-last_update_time: 1764740326992
-lifecycle_stage: active
-name: Exp9_SBERT_LightGBM_HYBRID_FIXED
