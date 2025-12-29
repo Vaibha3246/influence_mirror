@@ -1,0 +1,11 @@
+2025-11-01 21:04:36,093 - feature_engineering - ERROR - Feature engineering error: [Errno 2] No such file or directory: 'E:\\mlops_projects\\influence_mirror\\data\\interim\\train_processed.csv'
+2025-11-01 21:07:54,006 - feature_engineering - ERROR - Feature engineering error: 
+Looks like you are missing some required data for this feature.
+
+To download the necessary data, simply run
+
+    python -m textblob.download_corpora
+
+or use the NLTK downloader to download the missing data: http://nltk.org/data.html
+If this doesn't fix the problem, file an issue at https://github.com/sloria/TextBlob/issues.
+

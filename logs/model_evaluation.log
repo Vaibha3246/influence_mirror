@@ -1,0 +1,6 @@
+2025-12-05 07:34:06,351 - INFO - ### MODEL EVALUATION STARTED ###
+2025-12-05 07:34:06,421 - INFO - Loaded X_test shape: (9860, 405), y_test shape: (9860,)
+2025-12-05 07:34:06,421 - INFO - Loading model from: models\final_lgbm_model.pkl
+2025-12-05 07:34:11,980 - INFO - Accuracy: 0.7844827586206896, Macro Recall: 0.7668085540222901
+2025-12-05 07:34:29,604 - INFO - Found credentials in shared credentials file: ~/.aws/credentials
+2025-12-05 07:34:33,406 - INFO - ### MODEL EVALUATION COMPLETED SUCCESSFULLY ###
