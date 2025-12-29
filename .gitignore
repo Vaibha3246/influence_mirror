@@ -44,3 +44,6 @@ notebooks/
 # DVC internals
 
 .dvc/cache/
+
+.env
+
