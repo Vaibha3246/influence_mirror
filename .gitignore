@@ -2,48 +2,80 @@
 # Python
 __pycache__/
 *.py[cod]
+*.so
 
 
-# Virtual env
+# Packaging / Virtual Env
 
+.Python
 env/
 .venv/
+build/
+dist/
+*.egg-info/
+.eggs/
 
-# IDE
 
-.vscode/
+# Logs & caches
+
+*.log
+.cache/
+.mypy_cache/
+.pytest_cache/
+
+# IDEs
 .idea/
-
-# MLflow (NOT DVC)
-
-mlruns/
-mlflow.db
+.vscode/
+.spyproject/
 
 
-# NOTEBOOKS 
-notebooks/
+# Jupyter
+
+.ipynb_checkpoints/
 
 
-# MODELS 
+# Environment variables
+.env
+
+# OS files
+
+.DS_Store
+
+# DATA (DVC controlled)
+
+/data/*
+!/data/*.dvc
+
+
+# MODELS & ARTIFACTS (DVC controlled)
+notebooks/*.pkl
+notebooks/mlruns/
+!notebooks/*.dvc
+
+# DVC internals
+
+.dvc/cache/
+
+
+# Model files (DO NOT PUSH)
+
 *.pkl
 *.joblib
 *.h5
 *.pt
 *.bin
 
-# DATA 
-/data/*
-!/data/*.dvc
+# Data files
 
+data/
+*.csv
+*.parquet
 
-# ARTIFACTS
-/artifacts/*
-!/artifacts/*.dvc
+mlflow.db
 
+!/data/raw/youtube_bulk_raw.csv.dvc
 
-# DVC internals
-
-.dvc/cache/
-
-.env
-
+# Ignore everything in notebooks except DVC-tracked files
+notebooks/*.pkl
+notebooks/models/
+mlruns/
