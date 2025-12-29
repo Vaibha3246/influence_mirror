@@ -73,3 +73,9 @@ data/
 
 mlflow.db
 
+!/data/raw/youtube_bulk_raw.csv.dvc
+
+# Ignore everything in notebooks except DVC-tracked files
+notebooks/*.pkl
+notebooks/models/
+mlruns/
