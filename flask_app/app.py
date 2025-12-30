@@ -1,6 +1,5 @@
 
 # app.py
-print("🔥 CORRECT flask_app/app.py IS RUNNING")
 
 import os
 import json
@@ -369,7 +368,7 @@ def predict_api():
 
     if isinstance(texts, list):
 
-        BATCH_SIZE = 50   # ⭐ SAFE VALUE
+        BATCH_SIZE = 50   # SAFE VALUE
 
         results = []
         pos = neu = neg = 0
@@ -456,7 +455,7 @@ def ask_video():
     # Normalize user intent (summary / interview / resume)
     clean_question = normalize_question(question)
 
-    # 🔴 FIX 1: RAG CHUNKING + RETRIEVAL
+    #  FIX 1: RAG CHUNKING + RETRIEVAL
     chunks = chunk_text(video_context)
     top_chunks = retrieve_chunks(clean_question, chunks, top_k=4)
 

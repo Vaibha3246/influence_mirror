@@ -8,9 +8,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository
+      # 1. Checkout repository (FULL HISTORY)
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # 2. Set up Python
       - name: Set up Python
@@ -27,7 +29,7 @@ jobs:
           restore-keys: |
             pip-${{ runner.os }}-
 
-      # 4. Cache DVC cache folder
+      # 4. Cache DVC cache
       - name: Cache DVC
         uses: actions/cache@v3
         with:
@@ -43,16 +45,16 @@ jobs:
           pip install -r requirements.txt
           pip install "dvc[s3]"
 
-      # 6. Pull data from S3 remote
+      # 6. Pull data from S3
       - name: DVC Pull
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: eu-north-1
         run: |
-          python -m dvc pull
+          dvc pull
 
       # 7. Run DVC pipeline
       - name: Run DVC pipeline
         run: |
-          python -m dvc repro
+          dvc repro

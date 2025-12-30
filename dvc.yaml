@@ -6,7 +6,7 @@ stages:
       - src/data/data_ingestion.py
       - params.yaml
     params:
-      - data_ingestion.test_size
+      - data_ingestion.test_size 
     outs:
       - data/interim
 
