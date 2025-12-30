@@ -49,9 +49,9 @@ dist/
 # ===============================
 # DVC DATA (IMPORTANT)
 # ===============================
-data/**
-!data/**/*.dvc
-!data/**/.gitignore
+/data/**/*
+!/data/**/*.dvc
+!/data/**/.gitignore
 # ===============================
 # Models & Artifacts (NEVER PUSH)
 # ===============================
