@@ -8,40 +8,51 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository
+      # 1 Checkout code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Set up Python
+      # 2 Setup Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 3. Cache pip dependencies
-      - name: Cache pip dependencies
+      # 3 Cache pip dependencies (FAST)
+      - name: Cache pip
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}-${{ github.run_number }}
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            pip-${{ runner.os }}-
 
-      # 4. Install dependencies from requirements.txt
+      # 4 Cache DVC data (BIG SPEED BOOST)
+      - name: Cache DVC
+        uses: actions/cache@v3
+        with:
+          path: .dvc/cache
+          key: dvc-${{ runner.os }}-${{ hashFiles('dvc.lock') }}
+          restore-keys: |
+            dvc-${{ runner.os }}-
+
+      # 5 Install dependencies (cached)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install --no-cache-dir -r requirements.txt
+          pip install -r requirements.txt
+          pip install "dvc[s3]"
 
-      # 5. Ensure DVC is installed explicitly
-      - name: Install DVC
-        run: |
-          python -m pip install --no-cache-dir "dvc[s3]"
-
-      # 6. Run DVC pipeline using Python module (guaranteed)
-      - name: Run DVC pipeline
+      # 6 Pull data only if not cached
+      - name: DVC Pull
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: eu-north-1
-        run: python -m dvc repro
+        run: |
+          python -m dvc pull
+
+      # 7 Run pipeline (smart — skips unchanged stages)
+      - name: Run DVC pipeline
+        run: |
+          python -m dvc repro
