@@ -172,8 +172,8 @@ stages:
       size: 1379
     - path: requirements.txt
       hash: md5
-      md5: 20e7af55a2b5d7adf997ce43d834c026
-      size: 11322
+      md5: 87918d1536b8fb031d404a62e1e20eb4
+      size: 1878
     - path: src/model/model_building.py
       hash: md5
       md5: d0d67b5ce08317ddde8805b6beb25acf
