@@ -1,6 +1,0 @@
-2025-11-14 22:29:05,451 - ERROR - Model building failed: Invalid format specifier '.4f'' for object of type 'float'
-Traceback (most recent call last):
-  File "E:\mlops_projects\influence_mirror\src\model\model_building.py", line 284, in main
-    logger.info(f"Training complete | Test Accuracy: {result['metrics']['test_acc']:.4f'}")
-                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ValueError: Invalid format specifier '.4f'' for object of type 'float'
