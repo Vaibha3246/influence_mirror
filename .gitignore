@@ -47,16 +47,14 @@ dist/
 .DS_Store
 
 # ===============================
-# DVC Controlled Data
+# DVC DATA (IMPORTANT)
 # ===============================
-# Explicitly allow raw CSV (must be BEFORE ignore all)
-!/data/raw/youtube_bulk_raw.csv
+# Ignore ALL data files
+/data/**
 
-# Ignore all other data by default
-/data/*
-
-# Allow all .dvc files (including nested)
+# Allow ONLY DVC metafiles
 !/data/**/*.dvc
+!/data/**/.gitignore
 
 # ===============================
 # Models & Artifacts (NEVER PUSH)
