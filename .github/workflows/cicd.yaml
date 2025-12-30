@@ -8,17 +8,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1 Checkout code
+      # 1. Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2 Setup Python
+      # 2. Set up Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 3 Cache pip dependencies (FAST)
+      # 3. Cache pip dependencies
       - name: Cache pip
         uses: actions/cache@v3
         with:
@@ -27,7 +27,7 @@ jobs:
           restore-keys: |
             pip-${{ runner.os }}-
 
-      # 4 Cache DVC data (BIG SPEED BOOST)
+      # 4. Cache DVC cache folder
       - name: Cache DVC
         uses: actions/cache@v3
         with:
@@ -36,14 +36,14 @@ jobs:
           restore-keys: |
             dvc-${{ runner.os }}-
 
-      # 5 Install dependencies (cached)
+      # 5. Install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install "dvc[s3]"
 
-      # 6 Pull data only if not cached
+      # 6. Pull data from S3 remote
       - name: DVC Pull
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -52,7 +52,7 @@ jobs:
         run: |
           python -m dvc pull
 
-      # 7 Run pipeline (smart — skips unchanged stages)
+      # 7. Run DVC pipeline
       - name: Run DVC pipeline
         run: |
           python -m dvc repro
