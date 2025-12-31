@@ -63,7 +63,7 @@ def main():
         logger.info("Raw data not found locally. Downloading from S3...")
         download_from_s3(
             bucket="my-s3-bucket-of-store-artifact-youtube-data12",
-            key="youtube_bulk_raw.csv",
+            key="data/raw/youtube_bulk_raw.csv",
             local_path=str(raw_path)
         )
 
