@@ -2,11 +2,10 @@ stages:
   data_ingestion:
     cmd: python src/data/data_ingestion.py
     deps:
-      - data/raw/youtube_bulk_raw.csv
       - src/data/data_ingestion.py
       - params.yaml
     params:
-      - data_ingestion.test_size 
+      - data_ingestion.test_size
     outs:
       - data/interim
 
@@ -27,7 +26,7 @@ stages:
       - data/processed
 
   feature_engineering:
-    cmd: python src/features/feature_engineering.py   
+    cmd: python src/features/feature_engineering.py
     deps:
       - src/features/feature_engineering.py
       - data/processed/train_preprocessed.csv
@@ -36,7 +35,7 @@ stages:
     params:
       - feature_engineering.batch_size
     outs:
-      - data/features   
+      - data/features
 
   model_building:
     cmd: python src/model/model_building.py
@@ -62,7 +61,7 @@ stages:
       - params.yaml
     outs:
       - artifacts/classification_report.json
-      - artifacts/confusion_matrix.png  
+      - artifacts/confusion_matrix.png
 
   model_register:
     cmd: python src/model/model_register.py
@@ -76,9 +75,4 @@ stages:
       - model_register.mlflow_experiment_name
       - model_register.model_version_file
     outs:
-      - models/model_version.json  
-
-
-
-   
-  
+      - models/model_version.json
