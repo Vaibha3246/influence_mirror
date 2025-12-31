@@ -4,6 +4,8 @@ stages:
     deps:
       - src/data/data_ingestion.py
       - params.yaml
+      - data/raw/_raw_data_version.txt
+
     params:
       - data_ingestion.test_size
     outs:

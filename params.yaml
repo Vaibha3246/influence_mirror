@@ -11,8 +11,7 @@ data_preprocessing:
   sentiment_model_name: cardiffnlp/twitter-roberta-base-sentiment-latest
   min_word_count: 1
   max_word_count: 200
-  slang_json: "config/slang_dict.json"   
-
+  slang_json: "config/slang_dict.json" 
 
 feature_engineering:
   train_processed: "data/processed/train_preprocessed.csv"
