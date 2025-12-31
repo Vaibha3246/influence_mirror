@@ -1,5 +1,0 @@
-outs:
-- md5: c98db7ba7c89c46cf7e616608055c616
-  size: 8015787
-  hash: md5
-  path: data/raw/youtube_bulk_raw.csv

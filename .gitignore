@@ -52,6 +52,9 @@ dist/
 /data/**/*
 !/data/**/*.dvc
 !/data/**/.gitignore
+
+data/raw/*.csv
+
 # ===============================
 # Models & Artifacts (NEVER PUSH)
 # ===============================
