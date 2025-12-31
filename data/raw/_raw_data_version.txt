@@ -1,0 +1,3 @@
+bucket=my-s3-bucket-of-store-artifact-youtube-data12
+key=data/raw/youtube_bulk_raw.csv
+md5=INITIAL
