@@ -1,0 +1,4 @@
+[core]
+    remote = myremote
+['remote "myremote"']
+    url = s3://my-s3-bucket-of-store-artifact-youtube-data12
