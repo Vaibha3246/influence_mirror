@@ -6,6 +6,11 @@ jobs:
   dvc-pipeline:
     runs-on: ubuntu-latest
 
+    env:   
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: eu-north-1
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -39,11 +44,7 @@ jobs:
           restore-keys: |
             dvc-cache-
 
-      - name: Configure AWS
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: eu-north-1
+      - name: Verify AWS identity
         run: aws sts get-caller-identity
 
       - name: Pull DVC outputs
