@@ -21,7 +21,6 @@ jobs:
           pip install -r requirements.txt
           pip install "dvc[s3]" boto3 awscli textblob
 
-      #   FOR feature_engineering (NLTK + TextBlob data)
       - name: Download NLP resources
         run: |
           python - <<EOF
@@ -32,7 +31,6 @@ jobs:
           EOF
           python -m textblob.download_corpora
 
-      # DVC cache restore
       - name: Restore DVC cache
         uses: actions/cache@v4
         with:
@@ -46,19 +44,14 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: eu-north-1
-        run: |
-          aws sts get-caller-identity
+        run: aws sts get-caller-identity
 
-      - name: Run DVC pipeline
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: eu-north-1
-        run: |
-          dvc pull || true
-          dvc repro
+      - name: Pull DVC outputs
+        run: dvc pull
+
+      - name: Reproduce from feature engineering
+        run: dvc repro --downstream feature_engineering
 
       - name: Push DVC cache
         if: success()
-        run: |
-          dvc push
+        run: dvc push
