@@ -1,4 +1,5 @@
 import mlflow
+import os
 import pytest
 import numpy as np
 import tempfile
@@ -7,7 +8,7 @@ from mlflow.tracking import MlflowClient
 mlflow.set_tracking_uri("http://ec2-13-62-47-8.eu-north-1.compute.amazonaws.com:5000/")
 
 MODEL_NAME = "yt_chrome_plugin_model"
-STAGE = "Staging"
+STAGE = "Staging" 
 
 def test_mlflow_model_signature_ci_safe():
     client = MlflowClient()
@@ -25,11 +26,11 @@ def test_mlflow_model_signature_ci_safe():
     #  FIX: correct artifact path
     client.download_artifacts(
         mv.run_id,
-        "sample_input.npy",
+        "artifacts/sample_input.npy",
         tmp_dir
     )
 
-    sample_input = np.load(os.path.join(tmp_dir, "sample_input.npy"))
+    sample_input = np.load(os.path.join(tmp_dir, "artifacts", "sample_input.npy"))
 
     # Signature check
     model_info = mlflow.models.get_model_info(model_uri)
