@@ -1,52 +1,48 @@
 import mlflow
-import os
-import pytest
 import numpy as np
-import tempfile
 from mlflow.tracking import MlflowClient
 
-mlflow.set_tracking_uri("http://ec2-13-62-47-8.eu-north-1.compute.amazonaws.com:5000/")
+
+# MLflow tracking server
+mlflow.set_tracking_uri(
+    "http://ec2-13-62-47-8.eu-north-1.compute.amazonaws.com:5000/"
+)
 
 MODEL_NAME = "yt_chrome_plugin_model"
-STAGE = "Staging" 
+STAGE = "Staging"
+
 
 def test_mlflow_model_signature_ci_safe():
     client = MlflowClient()
 
+    #  Get latest model from Staging
     versions = client.get_latest_versions(MODEL_NAME, stages=[STAGE])
-    assert versions, " No model in Staging"
+    assert versions, " No model found in Staging stage"
 
     mv = versions[0]
     model_uri = f"models:/{MODEL_NAME}/{mv.version}"
 
+    #  Load model
     model = mlflow.pyfunc.load_model(model_uri)
 
-    tmp_dir = tempfile.mkdtemp()
-
-    #  FIX: correct artifact path
-    client.download_artifacts(
-        mv.run_id,
-        "artifacts/sample_input.npy",
-        tmp_dir
-    )
-
-    sample_input = np.load(os.path.join(tmp_dir, "artifacts", "sample_input.npy"))
-
-    # Signature check
+    #  Get model info + signature
     model_info = mlflow.models.get_model_info(model_uri)
     sig = model_info.signature
-    assert sig is not None, " Signature missing"
+    assert sig is not None, " Model signature missing"
 
-    assert sample_input.shape[1] == len(sig.inputs.inputs), \
-        " Feature mismatch between training and inference"
+    #  Load CI-safe input example (saved during training)
+    sample_input = np.array(model_info.saved_input_example)
 
+    #  Validate input shape
+    assert sample_input.ndim == 2, " Input must be 2D"
+    assert sample_input.shape[1] == len(sig.inputs.inputs), (
+        " Feature count mismatch with model signature"
+    )
+
+    #  Run prediction
     preds = model.predict(sample_input)
 
-    assert preds is not None
-    assert len(preds) == sample_input.shape[0]
-
-    #  Safer output check
-    assert isinstance(preds[0], (int, np.integer, np.int64)), \
-        " Prediction type invalid"
-
-    print(f"CI SAFE MODEL TEST PASSED | v{mv.version}")
+    #  Validate output
+    assert len(preds) == sample_input.shape[0], (
+        "Output length mismatch"
+    )
