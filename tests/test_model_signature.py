@@ -14,36 +14,26 @@ def test_mlflow_model_signature_ci_safe():
     client = MlflowClient()
     mv = client.get_latest_versions(MODEL_NAME, stages=[STAGE])[0]
 
-    # Load model
     model_uri = f"models:/{MODEL_NAME}/{mv.version}"
     model = mlflow.pyfunc.load_model(model_uri)
 
-    # Temp folder
     tmp_dir = tempfile.mkdtemp()
 
-    # DEBUG: list artifacts
-    print("Artifacts:", [f.path for f in client.list_artifacts(mv.run_id)])
-
-    #  CORRECT PATH (this is the fix)
     local_path = client.download_artifacts(
         mv.run_id,
-        "sample_input.npy",
+        "artifacts/sample_input.npy",
         tmp_dir
     )
 
     sample_input = np.load(local_path)
 
-    # Signature validation
     model_info = mlflow.models.get_model_info(model_uri)
     sig = model_info.signature
-    assert sig is not None, "Signature missing"
+    assert sig is not None
 
-    assert sample_input.shape[1] == len(sig.inputs.inputs), \
-        "Feature mismatch"
+    assert sample_input.shape[1] == len(sig.inputs.inputs)
 
     preds = model.predict(sample_input)
-    assert preds is not None
     assert len(preds) == sample_input.shape[0]
 
     shutil.rmtree(tmp_dir)
-    print(f" CI SAFE MODEL SIGNATURE TEST PASSED | v{mv.version}")
