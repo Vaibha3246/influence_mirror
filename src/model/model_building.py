@@ -145,6 +145,13 @@ def main():
         joblib.dump(model, model_path)
         mlflow.log_artifact(model_path)
 
+            
+        #  REQUIRED FOR CI
+        os.makedirs("artifacts", exist_ok=True)
+        sample_input = X_train[:1].astype(np.float32)
+        np.save("artifacts/sample_input.npy", sample_input)
+        mlflow.log_artifact("artifacts/sample_input.npy")
+
         # Log model with signature
         signature = infer_signature(X_train, model.predict(X_train))
         mlflow.lightgbm.log_model(model, artifact_path="model", signature=signature)
