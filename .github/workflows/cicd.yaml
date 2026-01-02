@@ -6,7 +6,7 @@ jobs:
   dvc-pipeline:
     runs-on: ubuntu-latest
 
-    env:   
+    env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: eu-north-1
@@ -20,22 +20,32 @@ jobs:
         with:
           python-version: "3.11"
 
+      #  PIP CACHE (MOST IMPORTANT)
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install "dvc[s3]" boto3 awscli textblob
 
+      #  NLP resources – only once cached by pip
       - name: Download NLP resources
         run: |
           python - <<EOF
           import nltk
           nltk.download("punkt")
-          nltk.download("punkt_tab")
           nltk.download("stopwords")
           EOF
           python -m textblob.download_corpora
 
+      #  DVC CACHE
       - name: Restore DVC cache
         uses: actions/cache@v4
         with:
@@ -44,13 +54,14 @@ jobs:
           restore-keys: |
             dvc-cache-
 
-      - name: Verify AWS identity
+      - name: Verify AWS
         run: aws sts get-caller-identity
 
       - name: Pull DVC outputs
         run: dvc pull
 
-      - name: Reproduce from feature engineering
+      #  ONLY FEATURE → downstream
+      - name: Run pipeline from feature engineering
         run: dvc repro --downstream feature_engineering
 
       - name: Push DVC cache
