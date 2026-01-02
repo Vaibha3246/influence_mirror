@@ -105,8 +105,8 @@ stages:
       size: 646
     - path: src/model/model_building.py
       hash: md5
-      md5: 0ffb41b3b5cf69f7615a1d9643970ec8
-      size: 6167
+      md5: fe16364c17706254cfbd490ca4e4ed43
+      size: 6095
     params:
       params.yaml:
         model_building.early_stopping_rounds: 50
