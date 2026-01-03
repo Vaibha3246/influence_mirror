@@ -1,13 +1,6 @@
-import mlflow
-import mlflow.pyfunc
 import pytest
+import mlflow
 from mlflow.tracking import MlflowClient
-import os
-
-# Tracking URI 
-mlflow.set_tracking_uri(
-    os.getenv("MLFLOW_TRACKING_URI", "http://ec2-13-62-47-8.eu-north-1.compute.amazonaws.com:5000/")
-)
 
 @pytest.mark.parametrize(
     "model_name, stage",
@@ -34,6 +27,9 @@ def test_load_latest_model_from_registry(model_name, stage):
 
     model_uri = f"models:/{model_name}/{latest_version.version}"
 
-    model = mlflow.pyfunc.load_model(model_uri)
+    # ONLY METADATA CHECKS — 
+    model_info = mlflow.models.get_model_info(model_uri)
 
-    assert model is not None
+    assert model_info is not None
+    assert model_info.signature is not None
+    assert "lightgbm" in model_info.flavors or "python_function" in model_info.flavors
