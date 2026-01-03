@@ -3,8 +3,7 @@ name: CICD pipeline
 on:
   push:
     branches:
-      - master
-      - main
+     - master
 
 jobs:
   dvc-pipeline:
@@ -16,53 +15,31 @@ jobs:
       AWS_DEFAULT_REGION: eu-north-1
 
     steps:
-      #  Checkout repo
       - name: Checkout code
         uses: actions/checkout@v4
 
-      #  Setup Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      #  Cache pip (speed + stability)
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      #  Install dependencies (SAFE RESOLVER MODE)
-      - name: Install dependencies
+      - name: Upgrade pip
         run: |
           pip install --upgrade pip setuptools wheel
+
+      - name: Install dependencies (SAFE MODE)
+        run: |
           pip install --no-cache-dir -r requirements.txt
-          pip install awscli textblob pytest
+          pip install awscli pytest textblob
 
-      #  Cache DVC
-      - name: Cache DVC
-        uses: actions/cache@v4
-        with:
-          path: .dvc/cache
-          key: dvc-cache-${{ hashFiles('dvc.lock') }}
-          restore-keys: |
-            dvc-cache-
-
-      #  Verify AWS auth
       - name: Verify AWS credentials
         run: aws sts get-caller-identity
 
-      #  Pull only required DVC artifacts
-      - name: Pull DVC artifacts
-        run: dvc pull 
+      - name: Pull DVC data
+        run: dvc pull
 
-      #  Run model registry test
-      - name: Run model loading test
+      - name: Run model registry test
         run: pytest tests/test_model_registry.py
 
-      #  Run MLflow model signature test
       - name: Run model signature test
         run: pytest tests/test_model_signature.py
