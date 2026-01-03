@@ -3,7 +3,7 @@ name: CICD pipeline
 on:
   push:
     branches:
-     - master
+      - master
 
 jobs:
   dvc-pipeline:
@@ -27,10 +27,18 @@ jobs:
         run: |
           pip install --upgrade pip setuptools wheel
 
-      - name: Install dependencies (SAFE MODE)
+      - name: Install dependencies 
         run: |
           pip install --no-cache-dir -r requirements.txt
-          pip install awscli pytest textblob
+          # Pin DVC + AWS dependencies to prevent CI failure
+          pip install \
+            boto3==1.34.131 \
+            botocore==1.34.131 \
+            dvc==3.53.1 \
+            dvc-s3==3.1.0 \
+            awscli \
+            pytest \
+            textblob
 
       - name: Verify AWS credentials
         run: aws sts get-caller-identity
