@@ -1,6 +1,10 @@
 name: CICD pipeline
 
-on: [push]
+on:
+  push:
+    branches:
+      - master
+      - main
 
 jobs:
   dvc-pipeline:
@@ -12,50 +16,53 @@ jobs:
       AWS_DEFAULT_REGION: eu-north-1
 
     steps:
-      - uses: actions/checkout@v4
+      #  Checkout repo
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      #  Setup Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - uses: actions/cache@v4
+      #  Cache pip (speed + stability)
+      - name: Cache pip
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-      - run: |
-          pip install -r requirements.txt
-          pip install "dvc[s3]" boto3 awscli textblob
+      #  Install dependencies (SAFE RESOLVER MODE)
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install --no-cache-dir -r requirements.txt
+          pip install awscli textblob pytest
 
-      - uses: actions/cache@v4
+      #  Cache DVC
+      - name: Cache DVC
+        uses: actions/cache@v4
         with:
           path: .dvc/cache
           key: dvc-cache-${{ hashFiles('dvc.lock') }}
+          restore-keys: |
+            dvc-cache-
 
-      - run: aws sts get-caller-identity
+      #  Verify AWS auth
+      - name: Verify AWS credentials
+        run: aws sts get-caller-identity
 
-      - name: Pull DVC outputs ONLY
-        run: dvc pull
+      #  Pull only required DVC artifacts
+      - name: Pull DVC artifacts
+        run: dvc pull -v
 
-      - name: install test dependencies
-        run: |
-          pip install pytest  
-
+      #  Run model registry test
       - name: Run model loading test
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: eu-north-1
-        run: |
-          pytest tests/test_model_registry.py
+        run: pytest tests/test_model_registry.py
 
+      #  Run MLflow model signature test
       - name: Run model signature test
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: eu-north-1
-        run: |
-          pytest tests/test_model_signature.py
-
-      
-
+        run: pytest tests/test_model_signature.py
