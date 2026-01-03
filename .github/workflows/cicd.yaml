@@ -15,39 +15,39 @@ jobs:
       AWS_DEFAULT_REGION: eu-north-1
 
     steps:
+      #  Checkout
       - name: Checkout code
         uses: actions/checkout@v4
 
+      #  Python 3.11
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
+      #  Upgrade pip tools
       - name: Upgrade pip
         run: |
-          pip install --upgrade pip setuptools wheel
+          python -m pip install --upgrade pip setuptools wheel
 
-      - name: Install dependencies 
+      #  Install project dependencies (ONLY ONCE)
+      - name: Install dependencies
         run: |
           pip install --no-cache-dir -r requirements.txt
-          # Pin DVC + AWS dependencies to prevent CI failure
-          pip install \
-            boto3==1.34.131 \
-            botocore==1.34.131 \
-            dvc==3.53.1 \
-            dvc-s3==3.1.0 \
-            awscli \
-            pytest \
-            textblob
+          pip install pytest awscli textblob
 
+      #  Verify AWS credentials
       - name: Verify AWS credentials
         run: aws sts get-caller-identity
 
+      #  Pull DVC artifacts
       - name: Pull DVC data
         run: dvc pull
 
-      - name: Run model registry test
-        run: pytest tests/test_model_registry.py
+      #  Run tests
+      - name: Run model registry tests
+        run: pytest tests/test_model_registry.py -v
 
-      - name: Run model signature test
-        run: pytest tests/test_model_signature.py
+      - name: Run model signature tests
+        run: pytest tests/test_model_signature.py -v

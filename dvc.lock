@@ -101,8 +101,8 @@ stages:
       size: 1375
     - path: requirements.txt
       hash: md5
-      md5: d71c8a86bdca47fd064c02ae70d1a8ff
-      size: 646
+      md5: f9232c59d71b00916d1c448bcf040a99
+      size: 978
     - path: src/model/model_building.py
       hash: md5
       md5: fe16364c17706254cfbd490ca4e4ed43
@@ -159,8 +159,8 @@ stages:
       size: 1375
     - path: src/model/model_register.py
       hash: md5
-      md5: 9553a0415a1c9a13851656f8d254fe51
-      size: 3253
+      md5: 307682625ea56dbf8dc9a3a50f2c26e8
+      size: 4273
     params:
       params.yaml:
         model_register.mlflow_experiment_name: dvc_stage_sbert_lightgbm_hybrid
@@ -171,5 +171,5 @@ stages:
     outs:
     - path: models/model_version.json
       hash: md5
-      md5: 709eababb35c530935f3c714836e6530
+      md5: 9157fef81db75287b3b568a5587a1a99
       size: 75
