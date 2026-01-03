@@ -35,11 +35,21 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --no-cache-dir -r requirements.txt
-          pip install pytest awscli textblob
+          pip install pytest  textblob
 
       #  Verify AWS credentials
       - name: Verify AWS credentials
         run: aws sts get-caller-identity
+
+
+      - name: Check AWS + botocore versions
+        run: |
+          python - <<EOF
+          import boto3, botocore
+          print("boto3:", boto3.__version__)
+          print("botocore:", botocore.__version__)
+          EOF
+  
 
       #  Pull DVC artifacts
       - name: Pull DVC data
