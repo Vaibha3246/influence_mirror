@@ -61,3 +61,7 @@ jobs:
 
       - name: Run model signature tests
         run: pytest tests/test_model_signature.py -v
+
+      - name: Run model performance tests
+        run: pytest tests/test_model_performance.py -v
+
