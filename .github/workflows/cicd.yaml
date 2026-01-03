@@ -57,7 +57,7 @@ jobs:
 
       #  Pull only required DVC artifacts
       - name: Pull DVC artifacts
-        run: dvc pull -v
+        run: dvc pull 
 
       #  Run model registry test
       - name: Run model loading test
