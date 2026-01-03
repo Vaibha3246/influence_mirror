@@ -66,5 +66,5 @@ jobs:
         run: pytest tests/test_model_performance.py -v
 
       - name: Run model permote from staging to production
-        run: pytest tests/test_model_promote.py -v
+        run: pytest tests/model_promote.py -v
 
