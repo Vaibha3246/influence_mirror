@@ -1,82 +1,83 @@
 import os
 import pytest
-import requests
+from flask_app.app import app   # apna correct path rakho
 
 # -------------------------
-# CI CONFIG
+# TEST CLIENT (VERY IMPORTANT)
 # -------------------------
-BASE_URL = "http://localhost:8000"
+@pytest.fixture
+def client():
+    os.environ["IS_TESTING"] = "true"
+    app.config["TESTING"] = True
+
+    with app.test_client() as client:
+        yield client
 
 
 # -------------------------
 # HEALTH CHECK
 # -------------------------
-def test_health_endpoint():
-    r = requests.get(f"{BASE_URL}/health")
+def test_health_endpoint(client):
+    r = client.get("/health")
     assert r.status_code == 200
-    assert r.json()["status"] == "ok"
+    assert r.json["status"] == "ok"
 
 
 # -------------------------
 # PREDICT (MODEL DISABLED)
 # -------------------------
-def test_predict_model_not_loaded():
+def test_predict_model_not_loaded(client):
     payload = {
         "texts": ["This is a test comment"],
         "category": "education"
     }
 
-    r = requests.post(f"{BASE_URL}/predict", json=payload)
-
-    # In CI → model is disabled
+    r = client.post("/predict", json=payload)
     assert r.status_code == 503
-    assert "Model not loaded" in r.text
+    assert "Model not loaded" in r.json["error"]
 
 
 # -------------------------
 # ASK VIDEO (LLM DISABLED)
 # -------------------------
-def test_ask_video_disabled_in_test_mode():
+def test_ask_video_disabled_in_test_mode(client):
     payload = {
         "question": "Give summary",
         "video_context": "This video explains machine learning basics."
     }
 
-    r = requests.post(f"{BASE_URL}/ask-video", json=payload)
-
+    r = client.post("/ask-video", json=payload)
     assert r.status_code == 503
-    assert "LLM disabled" in r.text
+    assert "LLM disabled" in r.json["error"]
 
 
 # -------------------------
-# VIDEO TOPICS (SAFE)
+# VIDEO TOPICS
 # -------------------------
-def test_video_topics_endpoint():
+def test_video_topics_endpoint(client):
     payload = {
-        "video_context": "This video explains Python basics, loops, and functions."
+        "video_context": "Python basics, loops, and functions."
     }
 
-    r = requests.post(f"{BASE_URL}/video-topics", json=payload)
-
+    r = client.post("/video-topics", json=payload)
     assert r.status_code in [200, 503]
-    # 503 allowed if LLM blocked
 
-def test_suggested_questions_endpoint():
+
+def test_suggested_questions_endpoint(client):
     payload = {
-        "video_context": "This video explains data science and machine learning.",
+        "video_context": "Data science and machine learning",
         "chat_history": [
-            {"role": "user", "content": "What is data science?"},
-            {"role": "assistant", "content": "Data science is about data."}
+            {"role": "user", "content": "What is data science?"}
         ]
     }
 
-    r = requests.post(f"{BASE_URL}/suggested-questions", json=payload)
-
+    r = client.post("/suggested-questions", json=payload)
     assert r.status_code in [200, 503]
 
+
 # -------------------------
-# INVALID INPUT HANDLING
+# INVALID INPUT
 # -------------------------
-def test_predict_invalid_payload():
-    r = requests.post(f"{BASE_URL}/predict", json={})
+def test_predict_invalid_payload(client):
+    r = client.post("/predict", json={})
     assert r.status_code in [400, 503]
