@@ -54,7 +54,10 @@ jobs:
 
       #  Pull DVC artifacts
       - name: Pull DVC data
-        run: dvc pull
+        run: dvc pull]
+
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV 
 
       #  Run tests
       - name: Run model registry tests
@@ -67,7 +70,8 @@ jobs:
         run: pytest tests/test_model_performance.py -v
 
       - name: Run model permote from staging to production
-        run: python scripts/promote_model.py 
+        run: python scripts/promote_model.py
+         
 
       - name: Run Flask API tests
         run: |
