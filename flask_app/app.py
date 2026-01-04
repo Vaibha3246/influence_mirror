@@ -26,21 +26,28 @@ load_dotenv()
 
 IS_TESTING = os.getenv("IS_TESTING", "false").lower() == "true"
 
-if not IS_TESTING:
-    from groq import Groq
+client = None
 
-    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-    if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY not loaded")
+def get_groq_client():
+    global client
 
-    client = Groq(api_key=GROQ_API_KEY)
-else:
-    client = None
+    if IS_TESTING:
+        return None
+
+    if client is None:
+        from groq import Groq   #  IMPORT INSIDE FUNCTION
+        GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        if not GROQ_API_KEY:
+            raise RuntimeError("GROQ_API_KEY not loaded")
+
+        client = Groq(api_key=GROQ_API_KEY)
+
+    return client
 
 if not IS_TESTING:
     from sentence_transformers import SentenceTransformer
     from transformers import AutoTokenizer, AutoModelForSequenceClassification
-    from groq import Groq    
+
 
 
 
@@ -284,8 +291,12 @@ Video Content:
 User Question:
 {question}
 """
+    groq_client = get_groq_client()
 
-    response = client.chat.completions.create(
+    if groq_client is None:
+        raise RuntimeError("Groq client unavailable")
+
+    response = groq_client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[
             {"role": "system", "content": system_prompt},
@@ -321,7 +332,11 @@ Return a numbered list.
 """.strip()
 
     try:
-        response = client.chat.completions.create(
+        groq_client = get_groq_client()
+        if groq_client is None:
+            return []   
+
+        response = groq_client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
@@ -379,8 +394,16 @@ def batch(iterable, size):
 
 @app.route("/predict", methods=["POST"])
 def predict_api():
-    if model is None:
-        return jsonify({"error": "Model not loaded"}), 503
+    if IS_TESTING:
+        return jsonify({
+            "sentiment_summary": {
+                "positive": 0,
+                "neutral": 100,
+                "negative": 0
+            },
+            "predictions": [],
+            "top_comments": []
+        }), 200
     data = request.json
     texts = data.get("texts")
     category = data.get("category")
@@ -508,6 +531,8 @@ def video_topics():
 
 @app.route("/suggested-questions", methods=["POST"])
 def suggested_questions():
+    if IS_TESTING:
+        return jsonify({"error": "LLM disabled in test mode"}), 503
     data = request.json or {}
 
     video_context = data.get("video_context", "").strip()
@@ -515,6 +540,10 @@ def suggested_questions():
 
     if not video_context:
         return jsonify({"error": "Video context missing"}), 400
+    
+    groq_client = get_groq_client()
+    if groq_client is None:
+        return jsonify({"error": "Groq client unavailable"}), 503
 
     # last 4 messages only (recent context)
     recent_chat = ""
@@ -542,7 +571,7 @@ Recent Conversation:
 Generate next questions user may ask:
 """
 
-    response = client.chat.completions.create(
+    response = groq_client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,

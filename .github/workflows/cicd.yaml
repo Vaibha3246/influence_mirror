@@ -74,7 +74,7 @@ jobs:
 
       - name: Run Flask API tests
         env:
-          PYTEST_RUNNING: "1"
+          IS_TESTING: "true"
         run: |
           pytest tests/flask_api_test.py -v
 
