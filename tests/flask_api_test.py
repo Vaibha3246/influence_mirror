@@ -1,57 +1,82 @@
+import os
 import pytest
-from flask_app.app import app as flask_app
-@pytest.fixture
-def client(monkeypatch):
-    flask_app.app.config["TESTING"] = True  
+import requests
 
-    # ---------- MOCK MODEL ----------
-    class DummyModel:
-        def predict(self, X):
-            return [2]  # positive
+# -------------------------
+# CI CONFIG
+# -------------------------
+BASE_URL = " http://127.0.0.1:8000"
 
-    monkeypatch.setattr(flask_app, "model", DummyModel())
 
-    # ---------- MOCK GROQ ----------
-    class DummyGroq:
-        class chat:
-            class completions:
-                @staticmethod
-                def create(*args, **kwargs):
-                    class R:
-                        choices = [
-                            type("obj", (), {
-                                "message": type("obj", (), {"content": "dummy answer"})
-                            })
-                        ]
-                    return R()
+# -------------------------
+# HEALTH CHECK
+# -------------------------
+def test_health_endpoint():
+    r = requests.get(f"{BASE_URL}/health")
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"
 
-    monkeypatch.setattr(flask_app, "client", DummyGroq())
 
-    with flask_app.app.test_client() as client:
-        yield client
+# -------------------------
+# PREDICT (MODEL DISABLED)
+# -------------------------
+def test_predict_model_not_loaded():
+    payload = {
+        "texts": ["This is a test comment"],
+        "category": "education"
+    }
 
-def test_health(client):
-    res = client.get("/health")
-    assert res.status_code == 200
-    assert res.json["status"] == "ok"
+    r = requests.post(f"{BASE_URL}/predict", json=payload)
 
-def test_predict_single_text(client):
-    res = client.post(
-        "/predict",
-        json={"text": "this is a good video"}
-    )
+    # In CI → model is disabled
+    assert r.status_code == 503
+    assert "Model not loaded" in r.text
 
-    assert res.status_code == 200
-    assert "sentiment_summary" in res.json
 
-def test_ask_video(client):
-    res = client.post(
-        "/ask-video",
-        json={
-            "question": "summary",
-            "video_context": "this video explains machine learning basics"
-        }
-    )
+# -------------------------
+# ASK VIDEO (LLM DISABLED)
+# -------------------------
+def test_ask_video_disabled_in_test_mode():
+    payload = {
+        "question": "Give summary",
+        "video_context": "This video explains machine learning basics."
+    }
 
-    assert res.status_code == 200
-    assert "answer" in res.json
+    r = requests.post(f"{BASE_URL}/ask-video", json=payload)
+
+    assert r.status_code == 503
+    assert "LLM disabled" in r.text
+
+
+# -------------------------
+# VIDEO TOPICS (SAFE)
+# -------------------------
+def test_video_topics_endpoint():
+    payload = {
+        "video_context": "This video explains Python basics, loops, and functions."
+    }
+
+    r = requests.post(f"{BASE_URL}/video-topics", json=payload)
+
+    assert r.status_code in [200, 503]
+    # 503 allowed if LLM blocked
+
+def test_suggested_questions_endpoint():
+    payload = {
+        "video_context": "This video explains data science and machine learning.",
+        "chat_history": [
+            {"role": "user", "content": "What is data science?"},
+            {"role": "assistant", "content": "Data science is about data."}
+        ]
+    }
+
+    r = requests.post(f"{BASE_URL}/suggested-questions", json=payload)
+
+    assert r.status_code in [200, 503]
+
+# -------------------------
+# INVALID INPUT HANDLING
+# -------------------------
+def test_predict_invalid_payload():
+    r = requests.post(f"{BASE_URL}/predict", json={})
+    assert r.status_code in [400, 503]

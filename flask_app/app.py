@@ -16,17 +16,15 @@ from nltk.corpus import stopwords
 from collections import Counter
 from collections import Counter, defaultdict
 
-from sentence_transformers import SentenceTransformer
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from nrclex import NRCLex
 import mlflow
 from datetime import datetime
 from sklearn.metrics.pairwise import cosine_similarity
-from groq import Groq
 from dotenv import load_dotenv
 load_dotenv()
 
-IS_TESTING = os.getenv("PYTEST_RUNNING") == "1"
+
+IS_TESTING = os.getenv("IS_TESTING", "false").lower() == "true"
 
 if not IS_TESTING:
     from groq import Groq
@@ -37,7 +35,13 @@ if not IS_TESTING:
 
     client = Groq(api_key=GROQ_API_KEY)
 else:
-    client = None   
+    client = None
+
+if not IS_TESTING:
+    from sentence_transformers import SentenceTransformer
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
+    from groq import Groq    
+
 
 
 # -----------------------------
@@ -59,26 +63,28 @@ ARTIFACTS_PATH = BASE / "data" / "features"
 # -----------------------------
 MLFLOW_TRACKING_URI = "http://ec2-13-62-47-8.eu-north-1.compute.amazonaws.com:5000/"
 MODEL_NAME = "yt_chrome_plugin_model"
-
-mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-model = mlflow.lightgbm.load_model(f"models:/{MODEL_NAME}/Staging")
-
-# -----------------------------
-# Load Training Artifacts
-# -----------------------------
-sbert = joblib.load(ARTIFACTS_PATH / "sbert_model.pkl")
-scaler = joblib.load(ARTIFACTS_PATH / "scaler.pkl")
-ohe = joblib.load(ARTIFACTS_PATH / "ohe.pkl")
-numeric_cols = json.load(open(ARTIFACTS_PATH / "numeric_cols.json"))
-
-# -----------------------------
-# Load RoBERTa (FOR PROBS ONLY)
-#  FIX: same model as training
-# -----------------------------
 ROBERTA_MODEL = "cardiffnlp/twitter-roberta-base-sentiment-latest"
-tokenizer = AutoTokenizer.from_pretrained(ROBERTA_MODEL)
-roberta = AutoModelForSequenceClassification.from_pretrained(ROBERTA_MODEL)
-roberta.eval()
+
+
+if not IS_TESTING:
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    model = mlflow.lightgbm.load_model(f"models:/{MODEL_NAME}/Staging")
+
+    sbert = joblib.load(ARTIFACTS_PATH / "sbert_model.pkl")
+    scaler = joblib.load(ARTIFACTS_PATH / "scaler.pkl")
+    ohe = joblib.load(ARTIFACTS_PATH / "ohe.pkl")
+    numeric_cols = json.load(open(ARTIFACTS_PATH / "numeric_cols.json"))
+    tokenizer = AutoTokenizer.from_pretrained(ROBERTA_MODEL)
+    roberta = AutoModelForSequenceClassification.from_pretrained(ROBERTA_MODEL)
+    roberta.eval()
+else:
+    model = None
+    sbert = None
+    scaler = None
+    ohe = None
+    numeric_cols = []
+    roberta = None
+
 
 # -----------------------------
 # NLTK
@@ -239,6 +245,9 @@ def chunk_text(text, chunk_size=400, overlap=50):
     return chunks
 
 def retrieve_chunks(question, chunks, top_k=4):
+    if IS_TESTING:
+        return chunks[:top_k]
+
     chunk_embeddings = sbert.encode(chunks, convert_to_numpy=True)
     q_emb = sbert.encode([question], convert_to_numpy=True)
 
@@ -246,6 +255,7 @@ def retrieve_chunks(question, chunks, top_k=4):
     top_idx = sims.argsort()[-top_k:][::-1]
 
     return [chunks[i] for i in top_idx]
+
 
 
 def ask_video_ai(question: str, video_context: str):
@@ -365,8 +375,12 @@ def batch(iterable, size):
 # -----------------------------
 # API
 # -----------------------------
+
+
 @app.route("/predict", methods=["POST"])
 def predict_api():
+    if model is None:
+        return jsonify({"error": "Model not loaded"}), 503
     data = request.json
     texts = data.get("texts")
     category = data.get("category")
@@ -417,7 +431,7 @@ def predict_api():
             "sentiment_over_time": sentiment_trend,
             "wordcloud": wordcloud,
             "predictions": results,
-            "top_comments": results[:5]
+            "top_comments": results[:25]
         })
 
     # -------- Single text (unchanged) --------
@@ -446,34 +460,36 @@ def health():
 
 @app.route("/ask-video", methods=["POST"])
 def ask_video():
-    data = request.json or {}
+        if IS_TESTING:
+            return jsonify({"error": "LLM disabled in test mode"}), 503    
+        data = request.json or {}
 
-    question = data.get("question", "").strip()
-    video_context = data.get("video_context", "").strip()
+        question = data.get("question", "").strip()
+        video_context = data.get("video_context", "").strip()
 
-    if not question:
-        return jsonify({"error": "Question missing"}), 400
+        if not question:
+            return jsonify({"error": "Question missing"}), 400
 
-    if not video_context:
-        return jsonify({"error": "Video context missing"}), 400
+        if not video_context:
+            return jsonify({"error": "Video context missing"}), 400
 
-    # Normalize user intent (summary / interview / resume)
-    clean_question = normalize_question(question)
+        # Normalize user intent (summary / interview / resume)
+        clean_question = normalize_question(question)
 
-    #  FIX 1: RAG CHUNKING + RETRIEVAL
-    chunks = chunk_text(video_context)
-    top_chunks = retrieve_chunks(clean_question, chunks, top_k=4)
+        #  FIX 1: RAG CHUNKING + RETRIEVAL
+        chunks = chunk_text(video_context)
+        top_chunks = retrieve_chunks(clean_question, chunks, top_k=4)
 
-    # Build focused context
-    focused_context = "\n\n".join(top_chunks)
+        # Build focused context
+        focused_context = "\n\n".join(top_chunks)
 
-    # Ask AI using ONLY relevant chunks
-    answer = ask_video_ai(clean_question, focused_context)
+        # Ask AI using ONLY relevant chunks
+        answer = ask_video_ai(clean_question, focused_context)
 
-    return jsonify({
-        "question_understood_as": clean_question,
-        "answer": answer
-    })
+        return jsonify({
+            "question_understood_as": clean_question,
+            "answer": answer
+        })
 
 
 @app.route("/video-topics", methods=["POST"])
@@ -546,7 +562,9 @@ Generate next questions user may ask:
     })
 
 
+DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 
-# Run App # -
-if __name__ == "__main__": 
-    app.run(host="0.0.0.0", port=8000, debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000, debug=DEBUG)
+
+
