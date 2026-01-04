@@ -1,8 +1,8 @@
 import pytest
-import app as flask_app
+from flask_app.app import app as flask_app
 @pytest.fixture
 def client(monkeypatch):
-    flask_app.app.config["TESTING"] = True
+    flask_app.app.config["TESTING"] = True  
 
     # ---------- MOCK MODEL ----------
     class DummyModel:
