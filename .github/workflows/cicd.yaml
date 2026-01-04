@@ -74,8 +74,6 @@ jobs:
 
       - name: Run Flask API tests
         run: |
-          pytest tests/test_health.py -v
-          pytest tests/test_predict.py -v
-          pytest tests/test_ask_video.py -v
+          pytest tests/flask_api_test.py
 
 
