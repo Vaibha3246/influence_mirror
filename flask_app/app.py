@@ -26,13 +26,18 @@ from groq import Groq
 from dotenv import load_dotenv
 load_dotenv()
 
+IS_TESTING = os.getenv("PYTEST_RUNNING") == "1"
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not IS_TESTING:
+    from groq import Groq
 
-if not GROQ_API_KEY:
-    raise RuntimeError(" GROQ_API_KEY not loaded")
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY not loaded")
 
-client = Groq(api_key=GROQ_API_KEY)
+    client = Groq(api_key=GROQ_API_KEY)
+else:
+    client = None   
 
 
 # -----------------------------

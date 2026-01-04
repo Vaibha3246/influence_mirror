@@ -73,7 +73,9 @@ jobs:
         run: python scripts/promote_model.py 
 
       - name: Run Flask API tests
+        env:
+          PYTEST_RUNNING: "1"
         run: |
-          pytest tests/flask_api_test.py
+          pytest tests/flask_api_test.py -v
 
 
