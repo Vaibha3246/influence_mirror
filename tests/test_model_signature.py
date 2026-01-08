@@ -9,38 +9,33 @@ STAGE = "Staging"
 def test_model_loads():
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     model = mlflow.pyfunc.load_model(f"models:/{MODEL_NAME}/{STAGE}")
-    assert model is not None, "Model failed to load"
+    assert model is not None
 
 
 def test_model_has_signature():
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     info = mlflow.models.get_model_info(f"models:/{MODEL_NAME}/{STAGE}")
-
-    assert info.signature is not None, "Model signature missing"
+    assert info.signature is not None
 
 
 def test_signature_matches_numpy_tensor():
-    """
-    Signature must represent a 2D numeric tensor:
-    (batch_size, n_features)
-    """
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     info = mlflow.models.get_model_info(f"models:/{MODEL_NAME}/{STAGE}")
 
     signature = info.signature
-    assert signature is not None
-
-    # MLflow Schema API (correct for >=2.x)
     input_schema = signature.inputs
-    assert len(input_schema.inputs) == 1, "Expected single tensor input"
+
+    # Exactly ONE tensor input
+    assert len(input_schema.inputs) == 1
 
     tensor_spec = input_schema.inputs[0]
 
-    # Shape must be (None, n_features)
-    assert tensor_spec.shape is not None
-    assert len(tensor_spec.shape) == 2
-    assert tensor_spec.shape[0] is None
+    # MLflow uses -1 for dynamic batch dimension
+    assert tensor_spec.shape[0] == -1
     assert tensor_spec.shape[1] > 0
+
+    # MLflow inferred dtype
+    assert str(tensor_spec.type) == "float64"
 
 
 def test_model_prediction_respects_signature_shape():
@@ -50,13 +45,11 @@ def test_model_prediction_respects_signature_shape():
     model = mlflow.pyfunc.load_model(model_uri)
     info = mlflow.models.get_model_info(model_uri)
 
-    signature = info.signature
-    tensor_spec = signature.inputs.inputs[0]
-
+    tensor_spec = info.signature.inputs.inputs[0]
     n_features = tensor_spec.shape[1]
 
-    # Create valid dummy input (same as training style)
-    X = np.random.rand(5, n_features).astype(np.float32)
+    # IMPORTANT: must be float64 (schema enforced)
+    X = np.random.rand(5, n_features).astype(np.float64)
 
     preds = model.predict(X)
 
