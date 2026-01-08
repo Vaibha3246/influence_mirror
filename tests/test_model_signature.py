@@ -24,18 +24,15 @@ def test_model_has_signature():
 
 
 def test_model_has_input_example_artifact():
-    """
-    Input example is stored as an ARTIFACT in MLflow 3.x
-    """
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     model_uri = f"models:/{MODEL_NAME}/{STAGE}"
 
     local_path = mlflow.artifacts.download_artifacts(
-        artifact_uri=f"{model_uri}/input_example.json"
+        artifact_uri=f"{model_uri}/model/input_example.json"
     )
 
-    assert os.path.exists(local_path), "input_example artifact missing"
-    assert os.path.getsize(local_path) > 0, "input_example artifact empty"
+    assert os.path.exists(local_path), " input_example.json missing"
+    assert os.path.getsize(local_path) > 0, " input_example.json is empty"
 
 
 def test_model_prediction_with_signature_shape():
@@ -46,12 +43,14 @@ def test_model_prediction_with_signature_shape():
     info = mlflow.models.get_model_info(model_uri)
 
     signature = info.signature
-    input_names = signature.inputs.input_names()
+    assert signature is not None, "Signature missing"
 
-    n_features = len(input_names)
+    #  CORRECT WAY (tensor-based model)
+    tensor_spec = signature.inputs[0]
+    n_features = tensor_spec.shape[1]
 
     X = np.random.rand(5, n_features).astype(np.float32)
     preds = model.predict(X)
 
-    assert preds is not None, "Prediction returned None"
-    assert len(preds) == 5, "Prediction count mismatch"
+    assert preds is not None
+    assert len(preds) == 5
