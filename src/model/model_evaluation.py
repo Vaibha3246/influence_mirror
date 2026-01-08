@@ -100,6 +100,24 @@ def main():
     }
     logger.info(f"Evaluation Metrics: {metrics}")
 
+    # ------------------------- Save Metrics for CI -------------------------
+    os.makedirs("artifacts", exist_ok=True)
+    metrics_path = "artifacts/metrics.json"
+
+    with open(metrics_path, "w") as f:
+        json.dump(metrics, f, indent=4)
+
+    logger.info(f"Saved metrics for CI at: {metrics_path}")
+
+    baseline_path = "artifacts/baseline_metrics.json"
+
+    if not os.path.exists(baseline_path):
+        with open(baseline_path, "w") as f:
+            json.dump(metrics, f, indent=4)
+        logger.info("Baseline metrics created.")
+
+
+
     # Classification report
     report = classification_report(y_eval, y_pred, output_dict=True)
     os.makedirs("artifacts", exist_ok=True)

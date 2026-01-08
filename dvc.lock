@@ -9,8 +9,8 @@ stages:
       size: 100
     - path: params.yaml
       hash: md5
-      md5: 2841a11f88225a69b58b1d33d9ce6bd1
-      size: 1375
+      md5: 8d42df6262a75f64ca85f62a9ce5b704
+      size: 1402
     - path: src/data/data_ingestion.py
       hash: md5
       md5: fbe9990b267e31b65e2ae83933e0e3a5
@@ -41,8 +41,8 @@ stages:
       size: 5016396
     - path: params.yaml
       hash: md5
-      md5: 2841a11f88225a69b58b1d33d9ce6bd1
-      size: 1375
+      md5: 8d42df6262a75f64ca85f62a9ce5b704
+      size: 1402
     - path: src/data/data_preprocessing.py
       hash: md5
       md5: 23df299e01a85984dc847927eee01282
@@ -73,8 +73,8 @@ stages:
       size: 6647375
     - path: params.yaml
       hash: md5
-      md5: 2841a11f88225a69b58b1d33d9ce6bd1
-      size: 1375
+      md5: 8d42df6262a75f64ca85f62a9ce5b704
+      size: 1402
     - path: src/features/feature_engineering.py
       hash: md5
       md5: 2960848f9475154ded157b3e9604c502
@@ -85,7 +85,7 @@ stages:
     outs:
     - path: data/features
       hash: md5
-      md5: 925c90945cbe11f62faf6e5bb328c03f.dir
+      md5: d55687730e77dfd9b07c19fe69e8dd75.dir
       size: 274281948
       nfiles: 6
   model_building:
@@ -97,16 +97,16 @@ stages:
       size: 146288490
     - path: params.yaml
       hash: md5
-      md5: 2841a11f88225a69b58b1d33d9ce6bd1
-      size: 1375
+      md5: 8d42df6262a75f64ca85f62a9ce5b704
+      size: 1402
     - path: requirements.txt
       hash: md5
-      md5: f9232c59d71b00916d1c448bcf040a99
-      size: 978
+      md5: e786e70449aab7f0e55ecb5a3efc453a
+      size: 836
     - path: src/model/model_building.py
       hash: md5
-      md5: fe16364c17706254cfbd490ca4e4ed43
-      size: 6095
+      md5: 2ed48485f4a483284fda915a4f78ebf2
+      size: 6034
     params:
       params.yaml:
         model_building.early_stopping_rounds: 50
@@ -116,47 +116,47 @@ stages:
     outs:
     - path: models/lightgbm_best_model.pkl
       hash: md5
-      md5: 59a2e6670112d516a55ee3e2c6e6eec2
-      size: 3859596
+      md5: 2169a30c285cedb57bfe00be78903d3d
+      size: 4657804
   model_evaluation:
     cmd: python src/model/model_evaluation.py
     deps:
     - path: data/features/features_test.npz
       hash: md5
-      md5: f14f607536406e94805348643a3fd509
+      md5: 6bb1c088200831f0464216756f455a69
       size: 36595450
     - path: models/lightgbm_best_model.pkl
       hash: md5
-      md5: 59a2e6670112d516a55ee3e2c6e6eec2
-      size: 3859596
+      md5: 2169a30c285cedb57bfe00be78903d3d
+      size: 4657804
     - path: params.yaml
       hash: md5
-      md5: 2841a11f88225a69b58b1d33d9ce6bd1
-      size: 1375
+      md5: 8d42df6262a75f64ca85f62a9ce5b704
+      size: 1402
     - path: src/model/model_evaluation.py
       hash: md5
-      md5: 033772024938e1ee649aed6fc20f7552
-      size: 4643
+      md5: 74c9e41363e95e335c67c2465ebb0342
+      size: 5206
     outs:
     - path: artifacts/classification_report.json
       hash: md5
-      md5: 61a6be9a34b7aba9763725a8750a1af9
+      md5: 59f291085da8213d33c04ec9897b6f7a
       size: 905
     - path: artifacts/confusion_matrix.png
       hash: md5
-      md5: 8a4cbe9a7c9ec4b336586f69181f3813
-      size: 22152
+      md5: 258a7650df8714269844d134bc2a5214
+      size: 22756
   model_register:
     cmd: python src/model/model_register.py
     deps:
     - path: models/lightgbm_best_model.pkl
       hash: md5
-      md5: 59a2e6670112d516a55ee3e2c6e6eec2
-      size: 3859596
+      md5: 2169a30c285cedb57bfe00be78903d3d
+      size: 4657804
     - path: params.yaml
       hash: md5
-      md5: 2841a11f88225a69b58b1d33d9ce6bd1
-      size: 1375
+      md5: 8d42df6262a75f64ca85f62a9ce5b704
+      size: 1402
     - path: src/model/model_register.py
       hash: md5
       md5: 307682625ea56dbf8dc9a3a50f2c26e8
@@ -171,5 +171,5 @@ stages:
     outs:
     - path: models/model_version.json
       hash: md5
-      md5: 9157fef81db75287b3b568a5587a1a99
+      md5: 7a9d8a7e913f710c38464f101250f660
       size: 75

@@ -6,7 +6,7 @@ import lightgbm as lgb
 import logging
 from sklearn.model_selection import StratifiedKFold
 from sklearn.utils.class_weight import compute_class_weight
-from sklearn.metrics import recall_score, classification_report
+from sklearn.metrics import accuracy_score, f1_score, recall_score, classification_report
 import yaml
 from mlflow.models.signature import infer_signature
 
@@ -62,13 +62,13 @@ def train_model(X_train, y_train):
             "objective": "multiclass",
             "num_class": len(classes),
             "metric": "multi_logloss",
-            "n_jobs": -1,
             "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2, log=True),
             "num_leaves": trial.suggest_int("num_leaves", 31, 256),
             "max_depth": trial.suggest_int("max_depth", 3, 16),
-            "n_estimators": trial.suggest_int("n_estimators", 200, 1000),
+            "n_estimators": trial.suggest_int("n_estimators",500, 2000),
             "class_weight": cw_dict,
-            "random_state": RANDOM_STATE
+            "random_state": RANDOM_STATE,
+            "n_jobs": -1,
         }
 
         recalls = []
@@ -103,7 +103,7 @@ def train_model(X_train, y_train):
         "metric": "multi_logloss",
         "class_weight": cw_dict,
         "random_state": RANDOM_STATE,
-        "n_jobs": -1
+        "n_jobs": -1,
     })
 
     logger.info(f"Best Params: {best_params}")
@@ -111,24 +111,15 @@ def train_model(X_train, y_train):
     final_model = lgb.LGBMClassifier(**best_params)
     final_model.fit(X_train, y_train)
 
-    # -------------------------
-    # Evaluate on train for per-class recall
-    # -------------------------
-    train_preds = final_model.predict(X_train)
-    report = classification_report(y_train, train_preds, output_dict=True)
-    logger.info("Per-class recall on training data:")
-    for cls in report:
-        if cls.isdigit():  # Only class labels
-            logger.info(f"Class {cls} → Recall: {report[cls]['recall']:.4f}")
 
-    return final_model, cw_dict, best_params, report
+    return final_model, cw_dict, best_params
 
 # -------------------------
 # Main
 # -------------------------
 def main():
     X_train, y_train = load_features()
-    model, cw_dict, best_params, report = train_model(X_train, y_train)
+    model, cw_dict, best_params = train_model(X_train, y_train)
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
@@ -138,7 +129,6 @@ def main():
         for key, value in best_params.items():
             mlflow.log_param(key, value)
         mlflow.log_dict(cw_dict, "class_weights.json")
-        mlflow.log_dict(report, "train_classification_report.json")
 
         # Save model
         model_path = os.path.join(MODEL_DIR, "lightgbm_best_model.pkl")
@@ -146,12 +136,12 @@ def main():
         mlflow.log_artifact(model_path)
 
         #  CI-SAFE model logging 
-        sample_input = X_train[:1].astype(np.float32)
+        sample_input = X_train[:5].astype(np.float32)
 
-        signature = infer_signature(
-            sample_input,
-            model.predict(sample_input)
-        )
+        sample_output = model.predict(sample_input)
+
+        signature = infer_signature(sample_input, sample_output)
+
 
         mlflow.lightgbm.log_model(
             model,
@@ -159,6 +149,15 @@ def main():
             signature=signature,
             input_example=sample_input
         )
+
+        # -------------------------
+        # Log preprocessing artifacts
+        # -------------------------
+        if params.get("log_preprocess", False):
+            mlflow.log_artifact("data/features/sbert_model.pkl", artifact_path="preprocess")
+            mlflow.log_artifact("data/features/scaler.pkl", artifact_path="preprocess")
+            mlflow.log_artifact("data/features/ohe.pkl", artifact_path="preprocess")
+
 
         # Log requirements
         if os.path.exists("requirements.txt"):

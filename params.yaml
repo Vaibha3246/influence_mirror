@@ -27,6 +27,8 @@ model_building:
   model_dir: "models"
   mlflow_tracking_uri: "http://ec2-13-62-47-8.eu-north-1.compute.amazonaws.com:5000/"
   mlflow_experiment_name: "dvc_stage_sbert_lightgbm_hybrid"
+  log_preprocess: false
+
 
 model_evaluation:
   model_dir: "models"
