@@ -101,12 +101,12 @@ stages:
       size: 1402
     - path: requirements.txt
       hash: md5
-      md5: e786e70449aab7f0e55ecb5a3efc453a
-      size: 836
+      md5: 521dafb7c89993b854a242b78860c6f9
+      size: 870
     - path: src/model/model_building.py
       hash: md5
-      md5: 2ed48485f4a483284fda915a4f78ebf2
-      size: 6034
+      md5: d5ecf98946f13f4947c4454829d5bc70
+      size: 6132
     params:
       params.yaml:
         model_building.early_stopping_rounds: 50

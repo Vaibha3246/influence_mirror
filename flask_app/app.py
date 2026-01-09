@@ -15,13 +15,16 @@ import re, html, emoji
 from nltk.corpus import stopwords
 from collections import Counter
 from collections import Counter, defaultdict
-
+from mlflow.tracking import MlflowClient
 from nrclex import NRCLex
 import mlflow
 from datetime import datetime
 from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
 load_dotenv()
+
+
+ROBERTA_MODEL = "cardiffnlp/twitter-roberta-base-sentiment-latest"
 
 
 IS_TESTING = os.getenv("IS_TESTING", "false").lower() == "true"
@@ -47,6 +50,9 @@ def get_groq_client():
 if not IS_TESTING:
     from sentence_transformers import SentenceTransformer
     from transformers import AutoTokenizer, AutoModelForSequenceClassification
+    tokenizer = AutoTokenizer.from_pretrained(ROBERTA_MODEL)
+    roberta = AutoModelForSequenceClassification.from_pretrained(ROBERTA_MODEL)
+    roberta.eval()
 
 
 
@@ -60,37 +66,33 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 
 # -----------------------------
-# Base Paths
-# -----------------------------
-BASE = Path(__file__).resolve().parent.parent
-ARTIFACTS_PATH = BASE / "data" / "features"
-
-# -----------------------------
-# Load MLflow Model (Staging)
+# Load MLflow Model 
 # -----------------------------
 MLFLOW_TRACKING_URI = "http://ec2-13-62-47-8.eu-north-1.compute.amazonaws.com:5000/"
 MODEL_NAME = "yt_chrome_plugin_model"
-ROBERTA_MODEL = "cardiffnlp/twitter-roberta-base-sentiment-latest"
-
 
 if not IS_TESTING:
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    model = mlflow.lightgbm.load_model(f"models:/{MODEL_NAME}/Staging")
 
-    sbert = joblib.load(ARTIFACTS_PATH / "sbert_model.pkl")
-    scaler = joblib.load(ARTIFACTS_PATH / "scaler.pkl")
-    ohe = joblib.load(ARTIFACTS_PATH / "ohe.pkl")
-    numeric_cols = json.load(open(ARTIFACTS_PATH / "numeric_cols.json"))
-    tokenizer = AutoTokenizer.from_pretrained(ROBERTA_MODEL)
-    roberta = AutoModelForSequenceClassification.from_pretrained(ROBERTA_MODEL)
-    roberta.eval()
-else:
-    model = None
-    sbert = None
-    scaler = None
-    ohe = None
-    numeric_cols = []
-    roberta = None
+    model_uri = f"models:/{MODEL_NAME}/Staging"
+
+    # Load model
+    model = mlflow.lightgbm.load_model(model_uri)
+
+    #  Download ALL artifacts attached to the model
+    model_dir = mlflow.artifacts.download_artifacts(
+        artifact_uri=model_uri
+    )
+
+    preprocess_dir = os.path.join(model_dir, "preprocess")
+
+    # Load preprocessing artifacts
+    scaler = joblib.load(os.path.join(preprocess_dir, "scaler.pkl"))
+    ohe = joblib.load(os.path.join(preprocess_dir, "ohe.pkl"))
+    sbert = joblib.load(os.path.join(preprocess_dir, "sbert_model.pkl"))
+
+    with open(os.path.join(preprocess_dir, "numeric_cols.json")) as f:
+        numeric_cols = json.load(f)
 
 
 # -----------------------------
@@ -169,7 +171,7 @@ def get_roberta_probs(text):
     return probs.tolist()  # [neg, neu, pos]
 
 # -----------------------------
-# Feature Builder (100% MATCH)
+# Feature Builder 
 # -----------------------------
 def prepare_features(text, category=None):
 

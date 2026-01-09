@@ -157,6 +157,8 @@ def main():
             mlflow.log_artifact("data/features/sbert_model.pkl", artifact_path="preprocess")
             mlflow.log_artifact("data/features/scaler.pkl", artifact_path="preprocess")
             mlflow.log_artifact("data/features/ohe.pkl", artifact_path="preprocess")
+            mlflow.log_artifact("data/features/numeric_cols.json", artifact_path="preprocess")
+
 
 
         # Log requirements
